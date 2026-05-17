@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Éditeur Outdoor PRO - Valhalla & Open-Meteo Unifié</title>
+    <title>Éditeur Outdoor PRO - Retour aux Sources</title>
     
+    <!-- Leaflet (Cartographie) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Chart.js (Graphique interactif) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
@@ -298,10 +300,10 @@
         nextBtn.addEventListener('click', () => { currentAngleOffset += 0.8; générerTracéMaitre(); });
 
         function générerTracéMaitre() {
-            générerTracéValhallaStable(1.0);
+            générerTracéValhallaPur(1.0);
         }
 
-        function générerTracéValhallaStable(facteurEchelle, iteration = 0) {
+        function générerTracéValhallaPur(facteurEchelle, iteration = 0) {
             if (waypoints.length === 0) return;
             
             const distanceChoisie = parseFloat(distanceSlider.value);
@@ -334,18 +336,16 @@
                 costing: "pedestrian",
                 costing_options: {
                     pedestrian: {
-                        type: "trail",
+                        type: "trail", // Force le passage sur les petits singles OSM
                         use_ferry: 0
                     }
                 },
                 id: "valhalla_outdoor"
             };
 
-            let url = `https://valhalla1.openstreetmap.de/route`;
+            document.getElementById('info').innerText = "Routage Valhalla en cours...";
 
-            document.getElementById('info').innerText = "Routage Valhalla (Recherche fine des sentiers)...";
-
-            fetch(url, {
+            fetch(`https://valhalla1.openstreetmap.de/route`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(jsonPayload)
@@ -372,14 +372,16 @@
                 let ratio = distanceChoisie / distanceCalculee;
 
                 if ((ratio < 0.94 || ratio > 1.06) && iteration < 3 && currentMode === 'auto') {
-                    générerTracéValhallaStable(facteurEchelle * ratio, iteration + 1);
+                    générerTracéValhallaPur(facteurEchelle * ratio, iteration + 1);
                 } else {
-                    // TRACÉ EN LIGNE IMPÉCCABLE -> EXTRACTION FRACTIONNÉE DU RELIEF RÉEL
-                    extraireReliefParLotsMeteo(coordinates, distanceCalculee);
+                    // PUR VALHALLA : On extrait uniquement la géométrie et on initialise les altitudes vides à 250m
+                    // Sans aucune fonction mathématique de secours sinusoïdale.
+                    let rawAltitudes = new Array(coordinates.length).fill(250);
+                    finaliserAffichageBrut(coordinates, rawAltitudes, distanceCalculee);
                 }
             })
             .catch(() => {
-                document.getElementById('info').innerText = "Erreur de connexion avec le serveur Valhalla.";
+                document.getElementById('info').innerText = "Erreur de connexion Valhalla.";
             });
         }
 
@@ -401,43 +403,7 @@
             return coordinates;
         }
 
-        // STRATÉGIE PAR LOTS DE 50 POINTS : Évite la saturation de l'URL et renvoie le relief exact
-        function extraireReliefParLotsMeteo(coordinates, distanceTotalKm) {
-            document.getElementById('info').innerText = "Téléchargement du relief réel par paquets...";
-
-            let promesses = [];
-            const tailleLot = 50;
-
-            for (let i = 0; i < coordinates.length; i += tailleLot) {
-                let tranche = coordinates.slice(i, i + tailleLot);
-                let lats = tranche.map(c => c[0].toFixed(5)).join(",");
-                let lons = tranche.map(c => c[1].toFixed(5)).join(",");
-                
-                let trancheUrl = `https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lons}`;
-                promesses.push(fetch(trancheUrl).then(r => r.json()));
-            }
-
-            // Une fois que toutes les sous-requêtes réelles sont arrivées, on fusionne
-            Promise.all(promesses)
-                .then(resultats => {
-                    let altitudesUnifiees = [];
-                    resultats.forEach(res => {
-                        if (res.elevation) {
-                            altitudesUnifiees = altitudesUnifiees.concat(res.elevation.map(alt => Math.round(alt)));
-                        }
-                    });
-
-                    if(altitudesUnifiees.length === 0) throw new Error();
-                    finaliserAffichage3D(coordinates, altitudesUnifiees, distanceTotalKm);
-                })
-                .catch(() => {
-                    // Secours strict linéaire calé uniquement sur les distances du test
-                    let secoursReel = coordinates.map((c, idx) => 240 + Math.round((idx / coordinates.length) * 90));
-                    finaliserAffichage3D(coordinates, secoursReel, distanceTotalKm);
-                });
-        }
-
-        function finaliserAffichage3D(coordinates, altitudes, distanceTotalKm) {
+        function finaliserAffichageBrut(coordinates, altitudes, distanceTotalKm) {
             globalCoordinates = coordinates;
             totalCalculatedDistance = distanceTotalKm;
 
@@ -449,7 +415,6 @@
             routeLayer = L.polyline(coordinates, { color: '#2c3e50', weight: 5, opacity: 0.85 }).addTo(map);
             invisibleHoverLayer = L.polyline(coordinates, { color: 'transparent', weight: 35, interactive: true }).addTo(map);
 
-            // Injection des altitudes réelles extraites sans aucun lissage destructeur
             globalAltitudes = altitudes;
 
             globalDistances = []; globalDPlusCumul = []; globalDMoinsCumul = []; globalColors = [];
@@ -507,7 +472,7 @@
 
             let chaineDuree = h > 0 ? `${h}h${m.toString().padStart(2, '0')}` : `${m} min`;
 
-            document.getElementById('info').innerHTML = `🏁 Trace et Relief Réel validés !<br>` +
+            document.getElementById('info').innerHTML = `🏁 Trace Valhalla brute chargée !<br>` +
                 `📏 Distance : <b>${totalCalculatedDistance.toFixed(1)} km</b> | ⛰️ D+ : <b>+${Math.round(totalCalculatedDPlus)}m</b><br>` +
                 `⏱️ Durée est. (${formatAllure(allureMinutesDecimale)}) : <span style="color:#3498db;font-size:14px;"><b>${chaineDuree}</b></span>`;
         }
@@ -517,7 +482,7 @@
 
             let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n` +
                              `<gpx version="1.1" creator="Générateur Outdoor" xmlns="http://www.topografix.com/GPX/1/1">\n` +
-                             `  <trk>\n    <name>Mon Tracé Valhalla Synchro</name>\n    <trkseg>\n`;
+                             `  <trk>\n    <name>Mon Tracé Brut</name>\n    <trkseg>\n`;
 
             for (let i = 0; i < globalCoordinates.length; i++) {
                 gpxContent += `      <trkpt lat="${globalCoordinates[i][0].toFixed(6)}" lon="${globalCoordinates[i][1].toFixed(6)}"><ele>${globalAltitudes[i]}</ele></trkpt>\n`;
@@ -571,12 +536,13 @@
                     datasets: [{
                         label: 'Altitude',
                         data: globalAltitudes,
-                        borderWidth: 4,
+                        borderWidth: 3,
                         pointRadius: 0,
                         fill: true,
-                        backgroundColor: 'rgba(44, 62, 80, 0.03)',
+                        backgroundColor: 'rgba(44, 62, 80, 0.05)',
                         segment: { borderColor: ctx => globalColors[ctx.p1DataIndex] },
-                        tension: 0.1
+                        stepped: true, // COMMANDE STRATEGIQUE : Force le rendu strict en escalier (n'invente aucune courbe)
+                        tension: 0
                     }]
                 },
                 options: {
