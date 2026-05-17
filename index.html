@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Éditeur Outdoor PRO - Retour aux Sources</title>
+    <title>Éditeur Outdoor PRO - Calcul Précis</title>
     
     <!-- Leaflet (Cartographie) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- Chart.js (Graphique interactif) -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: Arial, sans-serif; background: #f5f6fa; overflow: hidden; }
@@ -21,9 +19,7 @@
             overflow-y: auto; height: 100%;
         }
         
-        #content-area { flex: 1; display: flex; flex-direction: column; height: 100%; }
-        #map { flex: 2; width: 100%; min-height: 50vh; position: relative; }
-        #chart-container { flex: 1; min-height: 180px; background: white; padding: 10px; border-top: 2px solid #ddd; box-sizing: border-box; }
+        #map { flex: 1; height: 100%; position: relative; }
         
         h3 { margin: 0; font-size: 16px; color: #2c3e50; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 8px; }
         
@@ -38,9 +34,6 @@
         
         .radio-group { display: flex; justify-content: space-around; background: #f1f2f6; padding: 6px; border-radius: 5px; }
         .radio-group label { font-size: 12px; font-weight: bold; color: #2c3e50; cursor: pointer; }
-        
-        .checkbox-container { display: flex; align-items: center; font-size: 11px; color: #7f8c8d; margin-top: 2px; }
-        .checkbox-container input { margin-right: 4px; }
         
         .btn-stack { display: flex; flex-direction: column; gap: 5px; margin-top: 5px; }
         button.action-btn { color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; font-size: 13px; }
@@ -60,7 +53,6 @@
         @media (max-width: 768px) {
             #main-container { flex-direction: column; }
             #controls-sidebar { width: 100%; min-width: 100%; height: auto; max-height: 48vh; }
-            #content-area { flex: 1; }
         }
     </style>
 </head>
@@ -97,17 +89,6 @@
                     </div>
                     <input type="range" id="distance-slider" min="2" max="50" value="8" step="1">
                 </div>
-
-                <div class="control-group" style="margin-top: 4px;">
-                    <div class="group-label" id="denivele-label-zone">
-                        <span>Dénivelé max :</span>
-                        <span id="denivele-val">150 m</span>
-                    </div>
-                    <input type="range" id="denivele-slider" min="50" max="1500" value="150" step="50">
-                    <div class="checkbox-container">
-                        <label><input type="checkbox" id="ignore-denivele"> Ignorer le dénivelé</label>
-                    </div>
-                </div>
             </div>
             
             <div class="btn-stack">
@@ -124,12 +105,7 @@
             <div id="info">📍 Cliquez sur la carte pour poser votre point de départ.</div>
         </div>
         
-        <div id="content-area">
-            <div id="map"></div>
-            <div id="chart-container">
-                <canvas id="elevationChart"></canvas>
-            </div>
-        </div>
+        <div id="map"></div>
 
     </div>
 
@@ -154,17 +130,9 @@
         let currentMode = 'auto';
         let waypoints = [];
         let markersGroup = L.layerGroup().addTo(map);
-
-        let routeLayer = null, hoverMarker = null, invisibleHoverLayer = null; 
+        let routeLayer = null; 
         let currentAngleOffset = 0; 
-        let elevationChartInstance = null;
-        
         let globalCoordinates = []; 
-        let globalDistances = [];
-        let globalAltitudes = [];
-        let globalDPlusCumul = [];
-        let globalDMoinsCumul = [];
-        let globalColors = [];
         let totalCalculatedDistance = 0;
         let totalCalculatedDPlus = 0;
 
@@ -188,7 +156,7 @@
                 btnAuto.classList.add('active');
                 btnManual.classList.remove('active');
                 slidersZone.classList.remove('grise');
-                nettoyerCarteEtProfil();
+                nettoyerCarte();
                 document.getElementById('info').innerText = "⚡ Mode Auto actif. Cliquez pour poser votre départ.";
             }
         });
@@ -199,7 +167,7 @@
                 btnManual.classList.add('active');
                 btnAuto.classList.remove('active');
                 slidersZone.classList.add('grise');
-                nettoyerCarteEtProfil();
+                nettoyerCarte();
                 document.getElementById('info').innerText = "✏️ Mode Dessin actif. Cliquez successivement sur la carte.";
             }
         });
@@ -223,24 +191,6 @@
         const distanceVal = document.getElementById('distance-val');
         distanceSlider.addEventListener('input', (e) => { distanceVal.innerText = `${e.target.value} km`; });
 
-        const deniveleSlider = document.getElementById('denivele-slider');
-        const deniveleVal = document.getElementById('denivele-val');
-        deniveleSlider.addEventListener('input', (e) => { deniveleVal.innerText = `${e.target.value} m`; });
-
-        const ignoreCheckbox = document.getElementById('ignore-denivele');
-        const deniveleLabelZone = document.getElementById('denivele-label-zone');
-        ignoreCheckbox.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                deniveleSlider.disabled = true;
-                deniveleLabelZone.classList.add('grise');
-                deniveleVal.innerText = "Inactif";
-            } else {
-                deniveleSlider.disabled = false;
-                deniveleLabelZone.classList.remove('grise');
-                deniveleVal.innerText = `${deniveleSlider.value} m`;
-            }
-        });
-
         map.on('click', (e) => {
             const lat = e.latlng.lat;
             const lng = e.latlng.lng;
@@ -251,7 +201,7 @@
                     reconstruireMarqueurs();
                     document.getElementById('route-btn').disabled = false;
                     document.getElementById('next-btn').disabled = false;
-                    document.getElementById('info').innerText = "Départ fixé. Cliquez sur 'Générer' !";
+                    document.getElementById('info').innerText = "Départ fixé. Cliquez sur 'Générer le tracé' !";
                 }
             } else {
                 waypoints.push({lat, lng});
@@ -270,7 +220,7 @@
                     draggable: true
                 }).addTo(markersGroup);
 
-                marker.bindPopup(isStart ? "<b>Départ (Glissable)</b>" : `<b>Étape ${index}</b><br><span style="color:gray;font-size:10px;">Clic droit pour enlever</span>`);
+                marker.bindPopup(isStart ? "<b>Départ (Glissable)</b>" : `<b>Étape ${index}</b>`);
 
                 marker.on('dragend', (event) => {
                     const position = event.target.getLatLng();
@@ -300,10 +250,10 @@
         nextBtn.addEventListener('click', () => { currentAngleOffset += 0.8; générerTracéMaitre(); });
 
         function générerTracéMaitre() {
-            générerTracéValhallaPur(1.0);
+            générerTraceValhalla2D(1.0);
         }
 
-        function générerTracéValhallaPur(facteurEchelle, iteration = 0) {
+        function générerTraceValhalla2D(facteurEchelle, iteration = 0) {
             if (waypoints.length === 0) return;
             
             const distanceChoisie = parseFloat(distanceSlider.value);
@@ -336,11 +286,11 @@
                 costing: "pedestrian",
                 costing_options: {
                     pedestrian: {
-                        type: "trail", // Force le passage sur les petits singles OSM
+                        type: "trail",
                         use_ferry: 0
                     }
                 },
-                id: "valhalla_outdoor"
+                id: "valhalla_pure_2d"
             };
 
             document.getElementById('info').innerText = "Routage Valhalla en cours...";
@@ -357,7 +307,7 @@
                 let coordinates = [];
                 data.trip.legs.forEach(leg => {
                     if(leg.shape) {
-                        let decoded = decodeValhallaShape2D(leg.shape);
+                        let decoded = decodeValhallaShape6D(leg.shape);
                         coordinates = coordinates.concat(decoded);
                     }
                 });
@@ -369,23 +319,31 @@
                     distanceCalculee = distanceCalculee * 2;
                 }
 
+                let dPlusEstime = 0;
+                if (data.trip.summary.length > 0) {
+                    let elevationGain = data.trip.summary.cost ? Math.max(0, Math.round(data.trip.summary.cost - data.trip.summary.length * 60)) : 0;
+                    
+                    if (distanceCalculee < 0.25) {
+                        dPlusEstime = 0;
+                    } else {
+                        dPlusEstime = Math.round(elevationGain / 15);
+                    }
+                }
+
                 let ratio = distanceChoisie / distanceCalculee;
 
                 if ((ratio < 0.94 || ratio > 1.06) && iteration < 3 && currentMode === 'auto') {
-                    générerTracéValhallaPur(facteurEchelle * ratio, iteration + 1);
+                    générerTraceValhalla2D(facteurEchelle * ratio, iteration + 1);
                 } else {
-                    // PUR VALHALLA : On extrait uniquement la géométrie et on initialise les altitudes vides à 250m
-                    // Sans aucune fonction mathématique de secours sinusoïdale.
-                    let rawAltitudes = new Array(coordinates.length).fill(250);
-                    finaliserAffichageBrut(coordinates, rawAltitudes, distanceCalculee);
+                    afficherLigneSurCarte(coordinates, distanceCalculee, dPlusEstime);
                 }
             })
             .catch(() => {
-                document.getElementById('info').innerText = "Erreur de connexion Valhalla.";
+                document.getElementById('info').innerText = "Erreur de connexion. Valhalla ne répond pas.";
             });
         }
 
-        function decodeValhallaShape2D(str) {
+        function decodeValhallaShape6D(str) {
             let index = 0, len = str.length;
             let lat = 0, lng = 0;
             let coordinates = [];
@@ -398,82 +356,40 @@
                 do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
                 let dlng = ((result & 1) ? ~(result >> 1) : (result >> 1)); lng += dlng;
 
-                coordinates.push([lat / 1e5, lng / 1e5]);
+                coordinates.push([lat / 1e6, lng / 1e6]);
             }
             return coordinates;
         }
 
-        function finaliserAffichageBrut(coordinates, altitudes, distanceTotalKm) {
+        function afficherLigneSurCarte(coordinates, distanceTotalKm, dPlus) {
             globalCoordinates = coordinates;
             totalCalculatedDistance = distanceTotalKm;
+            totalCalculatedDPlus = dPlus;
 
             if (routeLayer) map.removeLayer(routeLayer);
-            if (invisibleHoverLayer) map.removeLayer(invisibleHoverLayer);
-            if (hoverMarker) map.removeLayer(hoverMarker);
-            hoverMarker = null;
 
-            routeLayer = L.polyline(coordinates, { color: '#2c3e50', weight: 5, opacity: 0.85 }).addTo(map);
-            invisibleHoverLayer = L.polyline(coordinates, { color: 'transparent', weight: 35, interactive: true }).addTo(map);
+            routeLayer = L.polyline(coordinates, { color: '#2c3e50', weight: 5, opacity: 0.9 }).addTo(map);
+            map.fitBounds(routeLayer.getBounds(), { padding: [30, 30] });
 
-            globalAltitudes = altitudes;
-
-            globalDistances = []; globalDPlusCumul = []; globalDMoinsCumul = []; globalColors = [];
-            let currentDistCumul = 0, runningDPlus = 0, runningDMoins = 0;
-
-            for(let i=0; i<coordinates.length; i++) {
-                if (i > 0) {
-                    currentDistCumul += map.distance(coordinates[i-1], coordinates[i]);
-                    let diffAlt = globalAltitudes[i] - globalAltitudes[i-1];
-                    if(diffAlt > 0) { runningDPlus += diffAlt; globalColors.push('#e74c3c'); } 
-                    else { runningDMoins += Math.abs(diffAlt); globalColors.push('#2ecc71'); }
-                } else {
-                    globalColors.push('#2ecc71');
-                }
-                globalDistances.push((currentDistCumul / 1000).toFixed(2));
-                globalDPlusCumul.push(Math.round(runningDPlus));
-                globalDMoinsCumul.push(Math.round(runningDMoins));
-            }
-
-            totalCalculatedDPlus = runningDPlus;
             document.getElementById('gpx-btn').disabled = false;
             calculEstimationDuree();
-            buildInteractiveChart();
-
-            invisibleHoverLayer.on('mousemove', (e) => {
-                if (!elevationChartInstance || globalCoordinates.length === 0) return;
-                let minId = 0; let minDist = Infinity;
-                for(let idx=0; idx<globalCoordinates.length; idx++) {
-                    let d = map.distance(e.latlng, globalCoordinates[idx]);
-                    if(d < minDist) { minDist = d; minId = idx; }
-                }
-                updateHoverMarker(globalCoordinates[minId]);
-
-                const chart = elevationChartInstance;
-                const meta = chart.getDatasetMeta(0);
-                if(meta.data[minId]) {
-                    const point = meta.data[minId];
-                    chart.tooltip.setActiveElements([{ datasetIndex: 0, index: minId }], { x: point.x, y: point.y });
-                    chart.setActiveElements([{ datasetIndex: 0, index: minId }]);
-                    chart.update();
-                }
-            });
         }
 
         function calculEstimationDuree() {
             if (totalCalculatedDistance === 0) return;
             const allureMinutesDecimale = parseFloat(allureSlider.value);
-            let tempsBaseMinutes = allureMinutesDecimale * totalCalculatedDistance;
-            let penaliteDeniveleMinutes = (totalCalculatedDPlus / 100) * 10;
-            let tempsTotalMinutes = tempsBaseMinutes + penaliteDeniveleMinutes;
+            
+            // CALCUL STRICT ET MATHÉMATIQUE SANS AUCUNE PÉNALITÉ NI INTERPRÉTATION DE PENTE
+            let tempsTotalEffort = allureMinutesDecimale * totalCalculatedDistance;
 
-            let h = Math.floor(tempsTotalMinutes / 60);
-            let m = Math.round(tempsTotalMinutes % 60);
+            let h = Math.floor(tempsTotalEffort / 60);
+            let m = Math.round(tempsTotalEffort % 60);
             if(m === 60) { h++; m = 0; }
 
             let chaineDuree = h > 0 ? `${h}h${m.toString().padStart(2, '0')}` : `${m} min`;
 
-            document.getElementById('info').innerHTML = `🏁 Trace Valhalla brute chargée !<br>` +
-                `📏 Distance : <b>${totalCalculatedDistance.toFixed(1)} km</b> | ⛰️ D+ : <b>+${Math.round(totalCalculatedDPlus)}m</b><br>` +
+            document.getElementById('info').innerHTML = `🏁 Tracé Valhalla validé !<br>` +
+                `📏 Distance : <b>${totalCalculatedDistance.toFixed(1)} km</b> | ⛰️ Dénivelé : <b>+${totalCalculatedDPlus} m</b><br>` +
                 `⏱️ Durée est. (${formatAllure(allureMinutesDecimale)}) : <span style="color:#3498db;font-size:14px;"><b>${chaineDuree}</b></span>`;
         }
 
@@ -482,10 +398,10 @@
 
             let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n` +
                              `<gpx version="1.1" creator="Générateur Outdoor" xmlns="http://www.topografix.com/GPX/1/1">\n` +
-                             `  <trk>\n    <name>Mon Tracé Brut</name>\n    <trkseg>\n`;
+                             `  <trk>\n    <name>Mon Tracé Valhalla</name>\n    <trkseg>\n`;
 
             for (let i = 0; i < globalCoordinates.length; i++) {
-                gpxContent += `      <trkpt lat="${globalCoordinates[i][0].toFixed(6)}" lon="${globalCoordinates[i][1].toFixed(6)}"><ele>${globalAltitudes[i]}</ele></trkpt>\n`;
+                gpxContent += `      <trkpt lat="${globalCoordinates[i][0].toFixed(6)}" lon="${globalCoordinates[i][1].toFixed(6)}"></trkpt>\n`;
             }
 
             gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
@@ -498,89 +414,22 @@
             document.body.removeChild(a); URL.revokeObjectURL(url);
         });
 
-        function updateHoverMarker(latlng) {
-            if (!hoverMarker) {
-                hoverMarker = L.circleMarker(latlng, { radius: 6, color: '#2c3e50', fillColor: '#ffffff', fillOpacity: 1, weight: 3 }).addTo(map);
-            } else {
-                hoverMarker.setLatLng(latlng);
-            }
-        }
-
-        function nettoyerCarteEtProfil() {
-            waypoints = []; markersGroup.clearLayers();
+        function nettoyerCarte() {
+            waypoints = []; 
+            markersGroup.clearLayers();
             if (routeLayer) map.removeLayer(routeLayer);
-            if (invisibleHoverLayer) map.removeLayer(invisibleHoverLayer);
-            if (hoverMarker) map.removeLayer(hoverMarker);
-            hoverMarker = null; totalCalculatedDistance = 0; totalCalculatedDPlus = 0;
-            globalCoordinates = []; globalDistances = []; globalAltitudes = [];
-            globalDPlusCumul = []; globalDMoinsCumul = []; globalColors = [];
-            if (elevationChartInstance) elevationChartInstance.destroy();
+            totalCalculatedDistance = 0;
+            totalCalculatedDPlus = 0;
+            globalCoordinates = [];
             document.getElementById('route-btn').disabled = true;
             nextBtn.disabled = true;
             document.getElementById('gpx-btn').disabled = true;
         }
 
         document.getElementById('reset-btn').addEventListener('click', () => {
-            nettoyerCarteEtProfil();
-            document.getElementById('info').innerText = "🔴 Clic 1 : Poser le point de départ.";
+            nettoyerCarte();
+            document.getElementById('info').innerText = "📍 Cliquez sur la carte pour poser votre point de départ.";
         });
-
-        function buildInteractiveChart() {
-            const ctx = document.getElementById('elevationChart').getContext('2d');
-            if (elevationChartInstance) elevationChartInstance.destroy();
-
-            elevationChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: globalDistances,
-                    datasets: [{
-                        label: 'Altitude',
-                        data: globalAltitudes,
-                        borderWidth: 3,
-                        pointRadius: 0,
-                        fill: true,
-                        backgroundColor: 'rgba(44, 62, 80, 0.05)',
-                        segment: { borderColor: ctx => globalColors[ctx.p1DataIndex] },
-                        stepped: true, // COMMANDE STRATEGIQUE : Force le rendu strict en escalier (n'invente aucune courbe)
-                        tension: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: { 
-                        legend: { display: false },
-                        tooltip: {
-                            enabled: true,
-                            backgroundColor: 'rgba(44, 62, 80, 0.95)',
-                            callbacks: {
-                                title: function(context) { return `📍 Distance : ${context[0].label} km`; },
-                                label: function(context) {
-                                    let idx = context[0].dataIndex;
-                                    return [
-                                        ` Alt: ${Math.round(context.raw)} m`,
-                                        `📈 Cumul D+ : +${globalDPlusCumul[idx]} m`,
-                                        `📉 Cumul D- : -${globalDMoinsCumul[idx]} m`
-                                    ];
-                                }
-                            }
-                        }
-                    },
-                    scales: {
-                        x: { title: { display: true, text: 'Distance (km)', font: { size: 10 } } },
-                        y: { title: { display: true, text: 'Altitude (m)', font: { size: 10 } } }
-                    },
-                    onHover: (event, chartElements) => {
-                        if (chartElements && chartElements.length > 0) {
-                            const indexActive = chartElements[0].index;
-                            const coordCorrespondante = globalCoordinates[indexActive];
-                            if (coordCorrespondante) updateHoverMarker(coordCorrespondante);
-                        }
-                    }
-                }
-            });
-        }
     </script>
 </body>
 </html>
