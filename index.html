@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Éditeur Outdoor PRO - Version Web Stable</title>
+    <title>Éditeur Outdoor PRO - Profil Stabilisé Infini</title>
     
     <!-- Leaflet (Cartographie) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -48,6 +48,7 @@
         .radio-group { display: flex; justify-content: space-around; background: #f1f2f6; padding: 8px; border-radius: 5px; }
         .radio-group label { font-size: 12px; font-weight: bold; color: #2c3e50; cursor: pointer; display: flex; align-items: center; gap: 4px; }
         
+        /* Menu jaune de sélection de méthode (Auto / Manuel) */
         #sub-drawing-mode { display: none; background: #fff3cd; border: 1px solid #ffeeba; padding: 6px; border-radius: 5px; flex-direction: column; gap: 4px; }
         .sub-mode-title { font-size: 11px; font-weight: bold; color: #856404; margin-bottom: 2px; text-align: center;}
         .drawing-type-selector { display: flex; gap: 4px; }
@@ -225,7 +226,7 @@
                 slidersZone.classList.add('grise');
                 subDrawingModeContainer.style.display = 'flex';
                 nettoyerCarte();
-                document.getElementById('info').innerText = "✏️ Mode Dessin actif. Cliquez successivement sur la carte.";
+                document.getElementById('info').innerText = "✏️ Mode Dessin actif. Cliquez pour poser vos points.";
             }
         });
 
@@ -350,8 +351,7 @@
                 } else {
                     const rayon = (distanceChoisie / 4) * 0.0072 * 0.68 * facteurEchelle;
                     segmentsAVisiter.push({ lat: start.lat + rayon * Math.cos(currentAngleOffset), lng: start.lng + rayon * Math.sin(currentAngleOffset), method: 'auto' });
-                    let sPts = { lat: start.lat + rayon * Math.cos(currentAngleOffset + 0.8), lng: start.lng + rayon * Math.sin(currentAngleOffset + 0.8), method: 'auto' };
-                    segmentsAVisiter.push(sPts);
+                    segmentsAVisiter.push({ lat: start.lat + rayon * Math.cos(currentAngleOffset + 0.8), lng: start.lng + rayon * Math.sin(currentAngleOffset + 0.8), method: 'auto' });
                     segmentsAVisiter.push({ lat: start.lat + rayon * Math.cos(currentAngleOffset + 1.6), lng: start.lng + rayon * Math.sin(currentAngleOffset + 1.6), method: 'auto' });
                     segmentsAVisiter.push({lat: start.lat, lng: start.lng, method: 'auto'});
                 }
@@ -418,117 +418,117 @@
             return R * c;
         }
 
-        function calculerVraiDPlus(coordinates, distanceTotalKm) {
+        // SOLUTION ULTIME PAR BLOCS : Découpe l'appel altimétrique pour ne plus jamais saturer l'URL
+        async function calculerVraiDPlus(coordinates, distanceTotalKm) {
             if (coordinates.length === 0) return;
-            document.getElementById('info').innerText = "Analyse et traitement du relief...";
+            document.getElementById('info').innerText = "Analyse et lissage du relief par blocs...";
 
-            let pas = Math.max(1, Math.floor(coordinates.length / 100));
-            let lats = [];
-            let lngs = [];
+            // Échantillonnage adaptatif ciblé à ~150 points d'altitude au total
+            let pas = Math.max(1, Math.floor(coordinates.length / 150));
             let indexOrigine = []; 
             
-            for (let i = 0; i < coordinates.length; i += pas) {
-                lats.push(coordinates[i][0].toFixed(6));
-                lngs.push(coordinates[i][1].toFixed(6));
-                indexOrigine.push(i);
-            }
-            if ((coordinates.length - 1) % pas !== 0) {
-                lats.push(coordinates[coordinates.length - 1][0].toFixed(6));
-                lngs.push(coordinates[coordinates.length - 1][1].toFixed(6));
-                indexOrigine.push(coordinates.length - 1);
-            }
+            for (let i = 0; i < coordinates.length; i += pas) { indexOrigine.push(i); }
+            if ((coordinates.length - 1) % pas !== 0) { indexOrigine.push(coordinates.length - 1); }
 
-            const urlElevation = "https://api.open-meteo.com/v1/elevation?latitude=" + lats.join(',') + "&longitude=" + lngs.join(',');
+            let rawElevations = [];
+            let tailleBloc = 30; // 30 coordonnées max par sous-URL (sécurité totale anti-CORS et taille GET)
 
-            fetch(urlElevation)
-            .then(res => {
-                if(!res.ok) throw new Error();
-                return res.json();
-            })
-            .then(data => {
-                let rawElevations = data.elevation;
-                if (!rawElevations || rawElevations.length === 0) return;
+            // Boucle asynchrone par paquets de coordonnées
+            for (let chunkStart = 0; chunkStart < indexOrigine.length; chunkStart += tailleBloc) {
+                let chunkIndices = indexOrigine.slice(chunkStart, chunkStart + tailleBloc);
+                let lats = chunkIndices.map(idx => coordinates[idx][0].toFixed(6));
+                let lngs = chunkIndices.map(idx => coordinates[idx][1].toFixed(6));
+
+                let urlElevationChunk = `https://api.open-meteo.com/v1/elevation?latitude=${lats.join(',')}&longitude=${lngs.join(',')}`;
                 
-                let smoothedElevations = [];
-                for (let i = 0; i < rawElevations.length; i++) {
-                    let p2 = rawElevations[Math.max(0, i - 2)];
-                    let p1 = rawElevations[Math.max(0, i - 1)];
-                    let curr = rawElevations[i];
-                    let n1 = rawElevations[Math.min(rawElevations.length - 1, i + 1)];
-                    let n2 = rawElevations[Math.min(rawElevations.length - 1, i + 2)];
-                    smoothedElevations.push((p2 + p1 + curr + n1 + n2) / 5);
+                try {
+                    let res = await fetch(urlElevationChunk);
+                    if (!res.ok) throw new Error();
+                    let data = await res.json();
+                    rawElevations = rawElevations.concat(data.elevation);
+                } catch(err) {
+                    console.warn("Échec d'un sous-bloc altimétrique, comblement par palier.");
+                    let valeurDerniere = rawElevations[rawElevations.length - 1] || 300;
+                    for (let x = 0; x < chunkIndices.length; x++) { rawElevations.push(valeurDerniere); }
                 }
+            }
 
-                let labelsDistance = [0];
-                let donneesAltitude = [smoothedElevations[0]];
-                let distanceAccumulee = 0;
+            if (rawElevations.length === 0) return;
+
+            // Filtre de moyenne mobile sur 5 points (Efface le bruit de flanc de coteau)
+            let smoothedElevations = [];
+            for (let i = 0; i < rawElevations.length; i++) {
+                let p2 = rawElevations[Math.max(0, i - 2)];
+                let p1 = rawElevations[Math.max(0, i - 1)];
+                let curr = rawElevations[i];
+                let n1 = rawElevations[Math.min(rawElevations.length - 1, i + 1)];
+                let n2 = rawElevations[Math.min(rawElevations.length - 1, i + 2)];
+                smoothedElevations.push((p2 + p1 + curr + n1 + n2) / 5);
+            }
+
+            let labelsDistance = [0];
+            let donneesAltitude = [smoothedElevations[0]];
+            let distanceAccumulee = 0;
+            
+            coordinateMappingIndices = [...indexOrigine];
+
+            for (let i = 1; i < smoothedElevations.length; i++) {
+                let ptA = coordinates[indexOrigine[i - 1]];
+                let ptB = coordinates[indexOrigine[i]];
+                distanceAccumulee += calculerDistanceEntreDeuxPoints(ptA[0], ptA[1], ptB[0], ptB[1]);
                 
-                coordinateMappingIndices = [...indexOrigine];
+                labelsDistance.push(distanceAccumulee.toFixed(1));
+                donneesAltitude.push(smoothedElevations[i]);
+            }
 
-                for (let i = 1; i < smoothedElevations.length; i++) {
-                    let ptA = coordinates[indexOrigine[i - 1]];
-                    let ptB = coordinates[indexOrigine[i]];
-                    distanceAccumulee += calculerDistanceEntreDeuxPoints(ptA[0], ptA[1], ptB[0], ptB[1]);
-                    
-                    labelsDistance.push(distanceAccumulee.toFixed(1));
-                    donneesAltitude.push(smoothedElevations[i]);
+            const formatChoisi = document.querySelector('input[name="format"]:checked').value;
+            if (formatChoisi === "aller-retour" && currentMode === 'auto') {
+                let miDistance = distanceTotalKm / 2;
+                let labelsAllerRetour = [...labelsDistance];
+                let donneesAllerRetour = [...donneesAltitude];
+                let mappingAllerRetour = [...coordinateMappingIndices];
+                
+                for(let j = labelsDistance.length - 2; j >= 0; j--) {
+                    let distRetour = miDistance + (miDistance - parseFloat(labelsDistance[j]));
+                    labelsAllerRetour.push(distRetour.toFixed(1));
+                    donneesAllerRetour.push(donneesAltitude[j]);
+                    mappingAllerRetour.push(coordinateMappingIndices[j]);
+                }
+                labelsDistance = labelsAllerRetour;
+                donneesAltitude = donneesAllerRetour;
+                coordinateMappingIndices = mappingAllerRetour;
+            }
+
+            // Calcul D+/D- amorti avec seuil à 6.0 mètres
+            let dPlusCumule = 0;
+            let dMoinsCumule = 0;
+            datasetDPlusCumule = [0];
+            datasetDMoinsCumule = [0];
+
+            let derniereAltitudeValide = donneesAltitude[0];
+            const SEUIL_OUTDOOR = 6.0; 
+
+            for (let k = 1; k < donneesAltitude.length; k++) {
+                let altActuelle = donneesAltitude[k];
+                let delta = altActuelle - derniereAltitudeValide;
+
+                if (delta >= SEUIL_OUTDOOR) {
+                    dPlusCumule += delta;
+                    derniereAltitudeValide = altActuelle; 
+                } else if (delta <= -SEUIL_OUTDOOR) {
+                    dMoinsCumule += Math.abs(delta);
+                    derniereAltitudeValide = altActuelle; 
                 }
 
-                const formatChoisi = document.querySelector('input[name="format"]:checked').value;
-                if (formatChoisi === "aller-retour" && currentMode === 'auto') {
-                    let miDistance = distanceTotalKm / 2;
-                    let labelsAllerRetour = [...labelsDistance];
-                    let donneesAllerRetour = [...donneesAltitude];
-                    let mappingAllerRetour = [...coordinateMappingIndices];
-                    
-                    for(let j = labelsDistance.length - 2; j >= 0; j--) {
-                        let distRetour = miDistance + (miDistance - parseFloat(labelsDistance[j]));
-                        labelsAllerRetour.push(distRetour.toFixed(1));
-                        donneesAllerRetour.push(donneesAltitude[j]);
-                        mappingAllerRetour.push(coordinateMappingIndices[j]);
-                    }
-                    labelsDistance = labelsAllerRetour;
-                    donneesAltitude = donneesAllerRetour;
-                    coordinateMappingIndices = mappingAllerRetour;
-                }
+                datasetDPlusCumule.push(Math.round(dPlusCumule));
+                datasetDMoinsCumule.push(Math.round(dMoinsCumule));
+            }
 
-                let dPlusCumule = 0;
-                let dMoinsCumule = 0;
-                datasetDPlusCumule = [0];
-                datasetDMoinsCumule = [0];
+            totalCalculatedDPlus = Math.round(dPlusCumule);
+            totalCalculatedDMoins = Math.round(dMoinsCumule);
 
-                let derniereAltitudeValide = donneesAltitude[0];
-                const SEUIL_OUTDOOR = 6.0; 
-
-                for (let k = 1; k < donneesAltitude.length; k++) {
-                    let altActuelle = donneesAltitude[k];
-                    let delta = altActuelle - derniereAltitudeValide;
-
-                    if (delta >= SEUIL_OUTDOOR) {
-                        dPlusCumule += delta;
-                        derniereAltitudeValide = altActuelle; 
-                    } else if (delta <= -SEUIL_OUTDOOR) {
-                        dMoinsCumule += Math.abs(delta);
-                        derniereAltitudeValide = altActuelle; 
-                    }
-
-                    datasetDPlusCumule.push(Math.round(dPlusCumule));
-                    datasetDMoinsCumule.push(Math.round(dMoinsCumule));
-                }
-
-                totalCalculatedDPlus = Math.round(dPlusCumule);
-                totalCalculatedDMoins = Math.round(dMoinsCumule);
-
-                afficherLigneSurCarte(coordinates, distanceTotalKm, totalCalculatedDPlus, totalCalculatedDMoins);
-                dessinerProfilAltimetrique(labelsDistance, donneesAltitude);
-            })
-            .catch(err => {
-                console.warn("Erreur altimétrie :", err);
-                let dPlusRepli = Math.round(distanceTotalKm * 14);
-                let dMoinsRepli = Math.round(distanceTotalKm * 14);
-                afficherLigneSurCarte(coordinates, distanceTotalKm, dPlusRepli, dMoinsRepli);
-                elevationContainer.style.display = "none";
-            });
+            afficherLigneSurCarte(coordinates, distanceTotalKm, totalCalculatedDPlus, totalCalculatedDMoins);
+            dessinerProfilAltimetrique(labelsDistance, donneesAltitude);
         }
 
         function dessinerProfilAltimetrique(labelsDistance, donneesAltitude) {
@@ -633,9 +633,7 @@
             if (routeLayer) map.removeLayer(routeLayer);
 
             routeLayer = L.polyline(coordinates, { color: '#2c3e50', weight: 5, opacity: 0.9 }).addTo(map);
-            
-            let bounds = routeLayer.getBounds();
-            map.fitBounds(bounds, { maxZoom: map.getZoom() });
+            map.fitBounds(routeLayer.getBounds(), { padding: [30, 30] });
 
             gpxBtn.disabled = false;
             calculEstimationDuree();
@@ -696,30 +694,6 @@
             }
         });
 
-        function nettoyerCarte() {
-            waypoints = []; 
-            markersGroup.clearLayers();
-            if (routeLayer) map.removeLayer(routeLayer);
-            if (hoverMarker) { map.removeLayer(hoverMarker); hoverMarker = null; }
-            totalCalculatedDistance = 0;
-            totalCalculatedDPlus = 0;
-            totalCalculatedDMoins = 0;
-            globalCoordinates = [];
-            coordinateMappingIndices = [];
-            datasetDPlusCumule = [];
-            datasetDMoinsCumule = [];
-            routeBtn.disabled = true;
-            nextBtn.disabled = true;
-            gpxBtn.disabled = true;
-            
-            if (elevationChart) {
-                elevationChart.destroy();
-                elevationChart = null;
-            }
-            elevationContainer.style.display = "none";
-            map.invalidateSize();
-        }
-
         function calculEstimationDuree() {
             if (totalCalculatedDistance === 0) return;
             const allureMinutesDecimale = parseFloat(allureSlider.value);
@@ -756,6 +730,30 @@
             document.body.appendChild(a); a.click();
             document.body.removeChild(a); URL.revokeObjectURL(url);
         });
+
+        function nettoyerCarte() {
+            waypoints = []; 
+            markersGroup.clearLayers();
+            if (routeLayer) map.removeLayer(routeLayer);
+            if (hoverMarker) { map.removeLayer(hoverMarker); hoverMarker = null; }
+            totalCalculatedDistance = 0;
+            totalCalculatedDPlus = 0;
+            totalCalculatedDMoins = 0;
+            globalCoordinates = [];
+            coordinateMappingIndices = [];
+            datasetDPlusCumule = [];
+            datasetDMoinsCumule = [];
+            routeBtn.disabled = true;
+            nextBtn.disabled = true;
+            gpxBtn.disabled = true;
+            
+            if (elevationChart) {
+                elevationChart.destroy();
+                elevationChart = null;
+            }
+            elevationContainer.style.display = "none";
+            map.invalidateSize();
+        }
 
         document.getElementById('reset-btn').addEventListener('click', () => {
             nettoyerCarte();
