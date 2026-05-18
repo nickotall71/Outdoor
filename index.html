@@ -3,10 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Éditeur Outdoor PRO - Calcul Précis</title>
+    <title>Éditeur Outdoor PRO - Version Web Stable</title>
     
     <!-- Leaflet (Cartographie) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- Chart.js (Profil Altimétrique) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: Arial, sans-serif; background: #f5f6fa; overflow: hidden; }
@@ -15,16 +18,26 @@
         #controls-sidebar {
             width: 340px; min-width: 340px; background: white; padding: 20px; 
             box-shadow: 2px 0 15px rgba(0,0,0,0.1); z-index: 1000; 
-            box-sizing: border-box; display: flex; flex-direction: column; gap: 10px;
+            box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;
             overflow-y: auto; height: 100%;
         }
         
-        #map { flex: 1; height: 100%; position: relative; }
+        #map-container { flex: 1; display: flex; flex-direction: column; height: 100%; position: relative; }
+        #map { flex: 1; width: 100%; }
+        
+        #elevation-container { 
+            height: 190px; 
+            background: white; 
+            border-top: 2px solid #ddd; 
+            padding: 10px 20px; 
+            box-sizing: border-box;
+            display: none;
+        }
         
         h3 { margin: 0; font-size: 16px; color: #2c3e50; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 8px; }
         
         .mode-selector { display: flex; gap: 4px; background: #f1f2f6; padding: 4px; border-radius: 6px; }
-        .mode-btn { flex: 1; background: transparent; color: #7f8c8d; padding: 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; }
+        .mode-btn { flex: 1; background: transparent; color: #7f8c8d; padding: 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; transition: all 0.2s; }
         .mode-btn.active { background: #2c3e50; color: white; }
         
         .control-group { margin-bottom: 2px; }
@@ -32,12 +45,18 @@
         
         input[type=range] { width: 100%; height: 6px; background: #ddd; border-radius: 3px; outline: none; cursor: pointer; }
         
-        .radio-group { display: flex; justify-content: space-around; background: #f1f2f6; padding: 6px; border-radius: 5px; }
-        .radio-group label { font-size: 12px; font-weight: bold; color: #2c3e50; cursor: pointer; }
+        .radio-group { display: flex; justify-content: space-around; background: #f1f2f6; padding: 8px; border-radius: 5px; }
+        .radio-group label { font-size: 12px; font-weight: bold; color: #2c3e50; cursor: pointer; display: flex; align-items: center; gap: 4px; }
         
-        .btn-stack { display: flex; flex-direction: column; gap: 5px; margin-top: 5px; }
-        button.action-btn { color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; font-size: 13px; }
-        button:disabled { background: #bdc3c7 !important; cursor: not-allowed; }
+        #sub-drawing-mode { display: none; background: #fff3cd; border: 1px solid #ffeeba; padding: 6px; border-radius: 5px; flex-direction: column; gap: 4px; }
+        .sub-mode-title { font-size: 11px; font-weight: bold; color: #856404; margin-bottom: 2px; text-align: center;}
+        .drawing-type-selector { display: flex; gap: 4px; }
+        .draw-btn { flex: 1; padding: 6px; font-size: 11px; border-radius: 4px; border: 1px solid #ccc; background: white; cursor: pointer; font-weight: bold; }
+        .draw-btn.active { background: #e67e22; color: white; border-color: #d35400; }
+
+        .btn-stack { display: flex; flex-direction: column; gap: 6px; margin-top: 5px; }
+        button.action-btn { color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; font-size: 13px; transition: opacity 0.2s; }
+        button:disabled { background: #bdc3c7 !important; cursor: not-allowed; opacity: 0.6; }
         
         #route-btn { background: #3498db; }
         #next-btn { background: #e67e22; }
@@ -48,11 +67,13 @@
         #reset-btn { background: #e74c3c; flex: 1; }
         
         .grise { opacity: 0.35; pointer-events: none; }
-        #info { margin-top: auto; font-size: 12px; color: #2c3e50; text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 10px; line-height: 1.4; }
+        #info { margin-top: auto; font-size: 12px; color: #2c3e50; text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 10px; line-height: 1.5; }
 
         @media (max-width: 768px) {
             #main-container { flex-direction: column; }
-            #controls-sidebar { width: 100%; min-width: 100%; height: auto; max-height: 48vh; }
+            #controls-sidebar { width: 100%; min-width: 100%; height: 40vh; max-height: 40vh; }
+            #map-container { height: 60vh; }
+            #elevation-container { height: 150px; padding: 5px 10px; }
         }
     </style>
 </head>
@@ -66,6 +87,14 @@
             <div class="mode-selector">
                 <button id="btn-mode-auto" class="mode-btn active">⚡ Auto (Curseurs)</button>
                 <button id="btn-mode-manual" class="mode-btn">✏️ Dessin (Points)</button>
+            </div>
+
+            <div id="sub-drawing-mode">
+                <div class="sub-mode-title">Type de liaison pour le prochain point :</div>
+                <div class="drawing-type-selector">
+                    <button id="draw-auto-btn" class="draw-btn active">🤖 Auto (Chemins)</button>
+                    <button id="draw-manual-btn" class="draw-btn">✏️ Manuel (Droit)</button>
+                </div>
             </div>
             
             <div class="radio-group">
@@ -105,36 +134,58 @@
             <div id="info">📍 Cliquez sur la carte pour poser votre point de départ.</div>
         </div>
         
-        <div id="map"></div>
+        <div id="map-container">
+            <div id="map"></div>
+            <div id="elevation-container">
+                <canvas id="elevationChart"></canvas>
+            </div>
+        </div>
 
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <script>
-        const planOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' });
-        const carteTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-            maxZoom: 17,
-            attribution: '© OpenTopoMap'
+        const planCarto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '© OpenStreetMap contributors © CARTO'
+        });
+        
+        const carteTopoEsri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles © Esri'
         });
 
         const map = L.map('map', {
             center: [46.4632, 4.6582],
             zoom: 12,
-            layers: [planOSM]
+            layers: [planCarto]
         });
 
-        const fondsDeCarte = { "Plan standard (OSM)": planOSM, "Carte Topo & Relief": carteTopo };
+        const fondsDeCarte = { "Plan standard (Carto)": planCarto, "Carte Topo & Relief (Esri)": carteTopoEsri };
         L.control.layers(fondsDeCarte, null, { collapsed: false }).addTo(map);
 
         let currentMode = 'auto';
-        let waypoints = [];
+        let drawingMethod = 'auto'; 
+        let waypoints = []; 
         let markersGroup = L.layerGroup().addTo(map);
         let routeLayer = null; 
+        let hoverMarker = null; 
         let currentAngleOffset = 0; 
         let globalCoordinates = []; 
+        let coordinateMappingIndices = []; 
         let totalCalculatedDistance = 0;
         let totalCalculatedDPlus = 0;
+        let totalCalculatedDMoins = 0;
+        let elevationChart = null; 
+
+        let datasetDPlusCumule = [];
+        let datasetDMoinsCumule = [];
+
+        const pointSuiviIcon = L.divIcon({
+            className: 'custom-hover-point',
+            html: '<div style="background-color: #3498db; width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,0.4);"></div>',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+        });
 
         const orangeIcon = new L.Icon({
             iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
@@ -149,6 +200,10 @@
         const btnManual = document.getElementById('btn-mode-manual');
         const slidersZone = document.getElementById('sliders-zone');
         const nextBtn = document.getElementById('next-btn');
+        const routeBtn = document.getElementById('route-btn');
+        const gpxBtn = document.getElementById('gpx-btn');
+        const elevationContainer = document.getElementById('elevation-container');
+        const subDrawingModeContainer = document.getElementById('sub-drawing-mode');
 
         btnAuto.addEventListener('click', () => {
             if(currentMode !== 'auto') {
@@ -156,6 +211,7 @@
                 btnAuto.classList.add('active');
                 btnManual.classList.remove('active');
                 slidersZone.classList.remove('grise');
+                subDrawingModeContainer.style.display = 'none';
                 nettoyerCarte();
                 document.getElementById('info').innerText = "⚡ Mode Auto actif. Cliquez pour poser votre départ.";
             }
@@ -167,9 +223,25 @@
                 btnManual.classList.add('active');
                 btnAuto.classList.remove('active');
                 slidersZone.classList.add('grise');
+                subDrawingModeContainer.style.display = 'flex';
                 nettoyerCarte();
                 document.getElementById('info').innerText = "✏️ Mode Dessin actif. Cliquez successivement sur la carte.";
             }
+        });
+
+        const drawAutoBtn = document.getElementById('draw-auto-btn');
+        const drawManualBtn = document.getElementById('draw-manual-btn');
+
+        drawAutoBtn.addEventListener('click', () => {
+            drawingMethod = 'auto';
+            drawAutoBtn.classList.add('active');
+            drawManualBtn.classList.remove('active');
+        });
+
+        drawManualBtn.addEventListener('click', () => {
+            drawingMethod = 'manual';
+            drawManualBtn.classList.add('active');
+            drawAutoBtn.classList.remove('active');
         });
 
         const allureSlider = document.getElementById('allure-slider');
@@ -197,17 +269,19 @@
             
             if (currentMode === 'auto') {
                 if (waypoints.length === 0) {
-                    waypoints.push({lat, lng});
+                    waypoints.push({lat, lng, method: 'auto'});
                     reconstruireMarqueurs();
-                    document.getElementById('route-btn').disabled = false;
-                    document.getElementById('next-btn').disabled = false;
+                    routeBtn.disabled = false;
+                    nextBtn.disabled = false;
                     document.getElementById('info').innerText = "Départ fixé. Cliquez sur 'Générer le tracé' !";
                 }
             } else {
-                waypoints.push({lat, lng});
+                waypoints.push({lat, lng, method: waypoints.length === 0 ? 'auto' : drawingMethod});
                 reconstruireMarqueurs();
-                document.getElementById('route-btn').disabled = false;
-                générerTracéMaitre();
+                if (waypoints.length >= 1) {
+                    routeBtn.disabled = false;
+                    générerTracéMaitre();
+                }
             }
         });
 
@@ -220,11 +294,12 @@
                     draggable: true
                 }).addTo(markersGroup);
 
-                marker.bindPopup(isStart ? "<b>Départ (Glissable)</b>" : `<b>Étape ${index}</b>`);
+                marker.bindPopup(isStart ? "<b>Départ (Glissable)</b>" : `<b>Étape ${index} (${wp.method})</b>`);
 
                 marker.on('dragend', (event) => {
                     const position = event.target.getLatLng();
-                    waypoints[index] = {lat: position.lat, lng: position.lng};
+                    waypoints[index].lat = position.lat;
+                    waypoints[index].lng = position.lng;
                     générerTracéMaitre();
                 });
 
@@ -246,140 +321,408 @@
             }
         });
 
-        document.getElementById('route-btn').addEventListener('click', () => { currentAngleOffset = 0; générerTracéMaitre(); });
+        routeBtn.addEventListener('click', () => { currentAngleOffset = 0; générerTracéMaitre(); });
         nextBtn.addEventListener('click', () => { currentAngleOffset += 0.8; générerTracéMaitre(); });
 
         function générerTracéMaitre() {
-            générerTraceValhalla2D(1.0);
+            générerParcoursHybride(1.0);
         }
 
-        function générerTraceValhalla2D(facteurEchelle, iteration = 0) {
+        async function générerParcoursHybride(facteurEchelle, iteration = 0) {
             if (waypoints.length === 0) return;
             
             const distanceChoisie = parseFloat(distanceSlider.value);
             const formatChoisi = document.querySelector('input[name="format"]:checked').value;
             
-            let ptsCalcul = [];
+            let segmentsAVisiter = [];
 
             if (currentMode === 'manual' || waypoints.length > 1) {
-                ptsCalcul = [...waypoints];
-                if (formatChoisi === "boucle") ptsCalcul.push(waypoints[0]);
+                segmentsAVisiter = [...waypoints];
+                if (formatChoisi === "boucle" && waypoints.length > 1) {
+                    segmentsAVisiter.push({lat: waypoints[0].lat, lng: waypoints[0].lng, method: drawingMethod});
+                }
             } else {
                 const start = waypoints[0];
-                ptsCalcul.push(start);
+                segmentsAVisiter.push(start);
                 if (formatChoisi === "aller-retour") {
                     const cap = (distanceChoisie / 2) * 0.0065 * 0.72 * facteurEchelle;
-                    ptsCalcul.push({ lat: start.lat + cap * Math.cos(currentAngleOffset), lng: start.lng + cap * Math.sin(currentAngleOffset) });
+                    segmentsAVisiter.push({ lat: start.lat + cap * Math.cos(currentAngleOffset), lng: start.lng + cap * Math.sin(currentAngleOffset), method: 'auto' });
                 } else {
                     const rayon = (distanceChoisie / 4) * 0.0072 * 0.68 * facteurEchelle;
-                    ptsCalcul.push({ lat: start.lat + rayon * Math.cos(currentAngleOffset), lng: start.lng + rayon * Math.sin(currentAngleOffset) });
-                    ptsCalcul.push({ lat: start.lat + rayon * Math.cos(currentAngleOffset + 0.8), lng: start.lng + rayon * Math.sin(currentAngleOffset + 0.8) });
-                    ptsCalcul.push({ lat: start.lat + rayon * Math.cos(currentAngleOffset + 1.6), lng: start.lng + rayon * Math.sin(currentAngleOffset + 1.6) });
-                    ptsCalcul.push(start);
+                    segmentsAVisiter.push({ lat: start.lat + rayon * Math.cos(currentAngleOffset), lng: start.lng + rayon * Math.sin(currentAngleOffset), method: 'auto' });
+                    let sPts = { lat: start.lat + rayon * Math.cos(currentAngleOffset + 0.8), lng: start.lng + rayon * Math.sin(currentAngleOffset + 0.8), method: 'auto' };
+                    segmentsAVisiter.push(sPts);
+                    segmentsAVisiter.push({ lat: start.lat + rayon * Math.cos(currentAngleOffset + 1.6), lng: start.lng + rayon * Math.sin(currentAngleOffset + 1.6), method: 'auto' });
+                    segmentsAVisiter.push({lat: start.lat, lng: start.lng, method: 'auto'});
                 }
             }
 
-            let locationsArray = ptsCalcul.map(p => ({ lat: p.lat, lon: p.lng }));
+            document.getElementById('info').innerText = "Calcul de l'itinéraire hybride...";
             
-            let jsonPayload = {
-                locations: locationsArray,
-                costing: "pedestrian",
-                costing_options: {
-                    pedestrian: {
-                        type: "trail",
-                        use_ferry: 0
-                    }
-                },
-                id: "valhalla_pure_2d"
-            };
+            let fullCoordinates = [];
+            let distanceTotaleCumulee = 0;
 
-            document.getElementById('info').innerText = "Routage Valhalla en cours...";
-
-            fetch(`https://valhalla1.openstreetmap.de/route`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(jsonPayload)
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (!data.trip || !data.trip.legs) return;
-
-                let coordinates = [];
-                data.trip.legs.forEach(leg => {
-                    if(leg.shape) {
-                        let decoded = decodeValhallaShape6D(leg.shape);
-                        coordinates = coordinates.concat(decoded);
-                    }
-                });
-
-                let distanceCalculee = data.trip.summary.length;
-
-                if (formatChoisi === "aller-retour" && currentMode === 'auto') {
-                    coordinates = coordinates.concat([...coordinates].reverse());
-                    distanceCalculee = distanceCalculee * 2;
+            for (let i = 0; i < segmentsAVisiter.length; i++) {
+                if (i === 0) {
+                    fullCoordinates.push([segmentsAVisiter[0].lat, segmentsAVisiter[0].lng]);
+                    continue;
                 }
 
-                let dPlusEstime = 0;
-                if (data.trip.summary.length > 0) {
-                    let elevationGain = data.trip.summary.cost ? Math.max(0, Math.round(data.trip.summary.cost - data.trip.summary.length * 60)) : 0;
-                    
-                    if (distanceCalculee < 0.25) {
-                        dPlusEstime = 0;
-                    } else {
-                        dPlusEstime = Math.round(elevationGain / 15);
-                    }
-                }
+                let ptPrecedent = segmentsAVisiter[i - 1];
+                let ptActuel = segmentsAVisiter[i];
 
-                let ratio = distanceChoisie / distanceCalculee;
-
-                if ((ratio < 0.94 || ratio > 1.06) && iteration < 3 && currentMode === 'auto') {
-                    générerTraceValhalla2D(facteurEchelle * ratio, iteration + 1);
+                if (ptActuel.method === 'manual') {
+                    fullCoordinates.push([ptActuel.lat, ptActuel.lng]);
+                    distanceTotaleCumulee += calculerDistanceEntreDeuxPoints(ptPrecedent.lat, ptPrecedent.lng, ptActuel.lat, ptActuel.lng);
                 } else {
-                    afficherLigneSurCarte(coordinates, distanceCalculee, dPlusEstime);
+                    try {
+                        let urlSegment = "https://brouter.de/brouter?lonlats=" + ptPrecedent.lng.toFixed(6) + "," + ptPrecedent.lat.toFixed(6) + "|" + ptActuel.lng.toFixed(6) + "," + ptActuel.lat.toFixed(6) + "&profile=trekking&alternativeidx=0&format=geojson";
+                        let response = await fetch(urlSegment);
+                        if (!response.ok) throw new Error();
+                        let data = await response.json();
+                        
+                        let pointsSegment = data.features[0].geometry.coordinates;
+                        let coordLatLon = pointsSegment.map(pt => [pt[1], pt[0]]);
+                        fullCoordinates = fullCoordinates.concat(coordLatLon.slice(1));
+                        
+                        distanceTotaleCumulee += data.features[0].properties['track-length'] / 1000;
+                    } catch (e) {
+                        fullCoordinates.push([ptActuel.lat, ptActuel.lng]);
+                        distanceTotaleCumulee += calculerDistanceEntreDeuxPoints(ptPrecedent.lat, ptPrecedent.lng, ptActuel.lat, ptActuel.lng);
+                    }
                 }
+            }
+
+            if (formatChoisi === "aller-retour" && currentMode === 'auto') {
+                fullCoordinates = fullCoordinates.concat([...fullCoordinates].reverse());
+                distanceTotaleCumulee = distanceTotaleCumulee * 2;
+            }
+
+            let ratio = distanceChoisie / distanceTotaleCumulee;
+
+            if ((ratio < 0.92 || ratio > 1.08) && iteration < 4 && currentMode === 'auto') {
+                générerParcoursHybride(facteurEchelle * ratio, iteration + 1);
+            } else {
+                calculerVraiDPlus(fullCoordinates, distanceTotaleCumulee);
+            }
+        }
+
+        function calculerDistanceEntreDeuxPoints(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function calculerVraiDPlus(coordinates, distanceTotalKm) {
+            if (coordinates.length === 0) return;
+            document.getElementById('info').innerText = "Analyse et traitement du relief...";
+
+            let pas = Math.max(1, Math.floor(coordinates.length / 100));
+            let lats = [];
+            let lngs = [];
+            let indexOrigine = []; 
+            
+            for (let i = 0; i < coordinates.length; i += pas) {
+                lats.push(coordinates[i][0].toFixed(6));
+                lngs.push(coordinates[i][1].toFixed(6));
+                indexOrigine.push(i);
+            }
+            if ((coordinates.length - 1) % pas !== 0) {
+                lats.push(coordinates[coordinates.length - 1][0].toFixed(6));
+                lngs.push(coordinates[coordinates.length - 1][1].toFixed(6));
+                indexOrigine.push(coordinates.length - 1);
+            }
+
+            const urlElevation = "https://api.open-meteo.com/v1/elevation?latitude=" + lats.join(',') + "&longitude=" + lngs.join(',');
+
+            fetch(urlElevation)
+            .then(res => {
+                if(!res.ok) throw new Error();
+                return res.json();
             })
-            .catch(() => {
-                document.getElementById('info').innerText = "Erreur de connexion. Valhalla ne répond pas.";
+            .then(data => {
+                let rawElevations = data.elevation;
+                if (!rawElevations || rawElevations.length === 0) return;
+                
+                let smoothedElevations = [];
+                for (let i = 0; i < rawElevations.length; i++) {
+                    let p2 = rawElevations[Math.max(0, i - 2)];
+                    let p1 = rawElevations[Math.max(0, i - 1)];
+                    let curr = rawElevations[i];
+                    let n1 = rawElevations[Math.min(rawElevations.length - 1, i + 1)];
+                    let n2 = rawElevations[Math.min(rawElevations.length - 1, i + 2)];
+                    smoothedElevations.push((p2 + p1 + curr + n1 + n2) / 5);
+                }
+
+                let labelsDistance = [0];
+                let donneesAltitude = [smoothedElevations[0]];
+                let distanceAccumulee = 0;
+                
+                coordinateMappingIndices = [...indexOrigine];
+
+                for (let i = 1; i < smoothedElevations.length; i++) {
+                    let ptA = coordinates[indexOrigine[i - 1]];
+                    let ptB = coordinates[indexOrigine[i]];
+                    distanceAccumulee += calculerDistanceEntreDeuxPoints(ptA[0], ptA[1], ptB[0], ptB[1]);
+                    
+                    labelsDistance.push(distanceAccumulee.toFixed(1));
+                    donneesAltitude.push(smoothedElevations[i]);
+                }
+
+                const formatChoisi = document.querySelector('input[name="format"]:checked').value;
+                if (formatChoisi === "aller-retour" && currentMode === 'auto') {
+                    let miDistance = distanceTotalKm / 2;
+                    let labelsAllerRetour = [...labelsDistance];
+                    let donneesAllerRetour = [...donneesAltitude];
+                    let mappingAllerRetour = [...coordinateMappingIndices];
+                    
+                    for(let j = labelsDistance.length - 2; j >= 0; j--) {
+                        let distRetour = miDistance + (miDistance - parseFloat(labelsDistance[j]));
+                        labelsAllerRetour.push(distRetour.toFixed(1));
+                        donneesAllerRetour.push(donneesAltitude[j]);
+                        mappingAllerRetour.push(coordinateMappingIndices[j]);
+                    }
+                    labelsDistance = labelsAllerRetour;
+                    donneesAltitude = donneesAllerRetour;
+                    coordinateMappingIndices = mappingAllerRetour;
+                }
+
+                let dPlusCumule = 0;
+                let dMoinsCumule = 0;
+                datasetDPlusCumule = [0];
+                datasetDMoinsCumule = [0];
+
+                let derniereAltitudeValide = donneesAltitude[0];
+                const SEUIL_OUTDOOR = 6.0; 
+
+                for (let k = 1; k < donneesAltitude.length; k++) {
+                    let altActuelle = donneesAltitude[k];
+                    let delta = altActuelle - derniereAltitudeValide;
+
+                    if (delta >= SEUIL_OUTDOOR) {
+                        dPlusCumule += delta;
+                        derniereAltitudeValide = altActuelle; 
+                    } else if (delta <= -SEUIL_OUTDOOR) {
+                        dMoinsCumule += Math.abs(delta);
+                        derniereAltitudeValide = altActuelle; 
+                    }
+
+                    datasetDPlusCumule.push(Math.round(dPlusCumule));
+                    datasetDMoinsCumule.push(Math.round(dMoinsCumule));
+                }
+
+                totalCalculatedDPlus = Math.round(dPlusCumule);
+                totalCalculatedDMoins = Math.round(dMoinsCumule);
+
+                afficherLigneSurCarte(coordinates, distanceTotalKm, totalCalculatedDPlus, totalCalculatedDMoins);
+                dessinerProfilAltimetrique(labelsDistance, donneesAltitude);
+            })
+            .catch(err => {
+                console.warn("Erreur altimétrie :", err);
+                let dPlusRepli = Math.round(distanceTotalKm * 14);
+                let dMoinsRepli = Math.round(distanceTotalKm * 14);
+                afficherLigneSurCarte(coordinates, distanceTotalKm, dPlusRepli, dMoinsRepli);
+                elevationContainer.style.display = "none";
             });
         }
 
-        function decodeValhallaShape6D(str) {
-            let index = 0, len = str.length;
-            let lat = 0, lng = 0;
-            let coordinates = [];
-            while (index < len) {
-                let b, shift = 0, result = 0;
-                do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-                let dlat = ((result & 1) ? ~(result >> 1) : (result >> 1)); lat += dlat;
-                
-                shift = 0; result = 0;
-                do { b = str.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-                let dlng = ((result & 1) ? ~(result >> 1) : (result >> 1)); lng += dlng;
+        function dessinerProfilAltimetrique(labelsDistance, donneesAltitude) {
+            elevationContainer.style.display = "block"; 
+            map.invalidateSize(); 
 
-                coordinates.push([lat / 1e6, lng / 1e6]);
+            if (elevationChart) {
+                elevationChart.destroy(); 
             }
-            return coordinates;
+
+            const ctx = document.getElementById('elevationChart').getContext('2d');
+            
+            let gradient = ctx.createLinearGradient(0, 0, 0, 140);
+            gradient.addColorStop(0, 'rgba(52, 152, 219, 0.35)');
+            gradient.addColorStop(1, 'rgba(52, 152, 219, 0.00)');
+
+            elevationChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labelsDistance,
+                    datasets: [{
+                        label: 'Altitude',
+                        data: donneesAltitude,
+                        borderColor: '#3498db',
+                        borderWidth: 2,
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.3, 
+                        pointRadius: 0, 
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                title: (tooltipItems) => `Distance : ${tooltipItems[0].label} km`,
+                                label: (context) => {
+                                    let idx = context.dataIndex;
+                                    let alt = context.parsed.y;
+                                    let dPlus = datasetDPlusCumule[idx] || 0;
+                                    let dMoins = datasetDMoinsCumule[idx] || 0;
+                                    return [
+                                        ` Altitude : ${alt.toFixed(0)} m`,
+                                        ` Cumul D+ : +${dPlus} m`,
+                                        ` Cumul D- : -${dMoins} m`
+                                    ];
+                                }
+                            }
+                        }
+                    },
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    onHover: (event, activeElements) => {
+                        if (activeElements && activeElements.length > 0 && globalCoordinates.length > 0) {
+                            const chartIndex = activeElements[0].index;
+                            const globalIndex = coordinateMappingIndices[chartIndex];
+                            
+                            if (globalIndex !== undefined && globalCoordinates[globalIndex]) {
+                                const targetCoord = globalCoordinates[globalIndex];
+                                if (!hoverMarker) {
+                                    hoverMarker = L.marker(targetCoord, { icon: pointSuiviIcon }).addTo(map);
+                                } else {
+                                    hoverMarker.setLatLng(targetCoord);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            title: { display: true, text: 'Distance (km)', font: { size: 11, weight: 'bold' } }
+                        },
+                        y: {
+                            title: { display: true, text: 'Altitude (m)', font: { size: 11, weight: 'bold' } }
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('elevationChart').addEventListener('mouseleave', () => {
+                if (hoverMarker) {
+                    map.removeLayer(hoverMarker);
+                    hoverMarker = null;
+                }
+            });
         }
 
-        function afficherLigneSurCarte(coordinates, distanceTotalKm, dPlus) {
+        function afficherLigneSurCarte(coordinates, distanceTotalKm, dPlus, dMoins) {
             globalCoordinates = coordinates;
             totalCalculatedDistance = distanceTotalKm;
             totalCalculatedDPlus = dPlus;
+            totalCalculatedDMoins = dMoins;
 
             if (routeLayer) map.removeLayer(routeLayer);
 
             routeLayer = L.polyline(coordinates, { color: '#2c3e50', weight: 5, opacity: 0.9 }).addTo(map);
-            map.fitBounds(routeLayer.getBounds(), { padding: [30, 30] });
+            
+            let bounds = routeLayer.getBounds();
+            map.fitBounds(bounds, { maxZoom: map.getZoom() });
 
-            document.getElementById('gpx-btn').disabled = false;
+            gpxBtn.disabled = false;
             calculEstimationDuree();
+        }
+
+        map.on('mousemove', (e) => {
+            if (!elevationChart || globalCoordinates.length === 0) return;
+
+            const mouseLatLng = e.latlng;
+            let plusProcheGlobalIndex = 0;
+            let distanceMin = Infinity;
+
+            for (let i = 0; i < globalCoordinates.length; i++) {
+                let d = mouseLatLng.distanceTo(globalCoordinates[i]); 
+                if (d < distanceMin) {
+                    distanceMin = d;
+                    plusProcheGlobalIndex = i;
+                }
+            }
+
+            if (distanceMin < 40) {
+                let plusProcheChartIndex = 0;
+                let diffMin = Infinity;
+                
+                for (let j = 0; j < coordinateMappingIndices.length; j++) {
+                    let diff = Math.abs(coordinateMappingIndices[j] - plusProcheGlobalIndex);
+                    if (diff < diffMin) {
+                        diffMin = diff;
+                        plusProcheChartIndex = j;
+                    }
+                }
+
+                const meta = elevationChart.getDatasetMeta(0);
+                const point = meta.data[plusProcheChartIndex];
+                
+                if (point) {
+                    elevationChart.setActiveElements([{ datasetIndex: 0, index: plusProcheChartIndex }]);
+                    elevationChart.tooltip.setActiveElements([{ datasetIndex: 0, index: plusProcheChartIndex }], {
+                        x: point.x,
+                        y: point.y
+                    });
+                    elevationChart.update();
+                }
+
+                if (!hoverMarker) {
+                    hoverMarker = L.marker(globalCoordinates[plusProcheGlobalIndex], { icon: pointSuiviIcon }).addTo(map);
+                } else {
+                    hoverMarker.setLatLng(globalCoordinates[plusProcheGlobalIndex]);
+                }
+            } else {
+                if (hoverMarker) {
+                    map.removeLayer(hoverMarker);
+                    hoverMarker = null;
+                }
+                elevationChart.setActiveElements([]);
+                elevationChart.tooltip.setActiveElements([], { x: 0, y: 0 });
+                elevationChart.update();
+            }
+        });
+
+        function nettoyerCarte() {
+            waypoints = []; 
+            markersGroup.clearLayers();
+            if (routeLayer) map.removeLayer(routeLayer);
+            if (hoverMarker) { map.removeLayer(hoverMarker); hoverMarker = null; }
+            totalCalculatedDistance = 0;
+            totalCalculatedDPlus = 0;
+            totalCalculatedDMoins = 0;
+            globalCoordinates = [];
+            coordinateMappingIndices = [];
+            datasetDPlusCumule = [];
+            datasetDMoinsCumule = [];
+            routeBtn.disabled = true;
+            nextBtn.disabled = true;
+            gpxBtn.disabled = true;
+            
+            if (elevationChart) {
+                elevationChart.destroy();
+                elevationChart = null;
+            }
+            elevationContainer.style.display = "none";
+            map.invalidateSize();
         }
 
         function calculEstimationDuree() {
             if (totalCalculatedDistance === 0) return;
             const allureMinutesDecimale = parseFloat(allureSlider.value);
-            
-            // CALCUL STRICT ET MATHÉMATIQUE SANS AUCUNE PÉNALITÉ NI INTERPRÉTATION DE PENTE
             let tempsTotalEffort = allureMinutesDecimale * totalCalculatedDistance;
 
             let h = Math.floor(tempsTotalEffort / 60);
@@ -388,17 +731,17 @@
 
             let chaineDuree = h > 0 ? `${h}h${m.toString().padStart(2, '0')}` : `${m} min`;
 
-            document.getElementById('info').innerHTML = `🏁 Tracé Valhalla validé !<br>` +
-                `📏 Distance : <b>${totalCalculatedDistance.toFixed(1)} km</b> | ⛰️ Dénivelé : <b>+${totalCalculatedDPlus} m</b><br>` +
+            document.getElementById('info').innerHTML = `🏁 Tracé hybride lissé !<br>` +
+                `📏 Distance : <b>${totalCalculatedDistance.toFixed(1)} km</b> | ⛰️ Relief : <b>+${totalCalculatedDPlus} m / -${totalCalculatedDMoins} m</b><br>` +
                 `⏱️ Durée est. (${formatAllure(allureMinutesDecimale)}) : <span style="color:#3498db;font-size:14px;"><b>${chaineDuree}</b></span>`;
         }
 
-        document.getElementById('gpx-btn').addEventListener('click', () => {
+        gpxBtn.addEventListener('click', () => {
             if (globalCoordinates.length === 0) return;
 
             let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n` +
                              `<gpx version="1.1" creator="Générateur Outdoor" xmlns="http://www.topografix.com/GPX/1/1">\n` +
-                             `  <trk>\n    <name>Mon Tracé Valhalla</name>\n    <trkseg>\n`;
+                             `  <trk>\n    <name>Mon Tracé Outdoor</name>\n    <trkseg>\n`;
 
             for (let i = 0; i < globalCoordinates.length; i++) {
                 gpxContent += `      <trkpt lat="${globalCoordinates[i][0].toFixed(6)}" lon="${globalCoordinates[i][1].toFixed(6)}"></trkpt>\n`;
@@ -413,18 +756,6 @@
             document.body.appendChild(a); a.click();
             document.body.removeChild(a); URL.revokeObjectURL(url);
         });
-
-        function nettoyerCarte() {
-            waypoints = []; 
-            markersGroup.clearLayers();
-            if (routeLayer) map.removeLayer(routeLayer);
-            totalCalculatedDistance = 0;
-            totalCalculatedDPlus = 0;
-            globalCoordinates = [];
-            document.getElementById('route-btn').disabled = true;
-            nextBtn.disabled = true;
-            document.getElementById('gpx-btn').disabled = true;
-        }
 
         document.getElementById('reset-btn').addEventListener('click', () => {
             nettoyerCarte();
