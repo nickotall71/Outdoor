@@ -25,13 +25,47 @@
         #map-container { flex: 1; display: flex; flex-direction: column; height: 100%; position: relative; }
         #map { flex: 1; width: 100%; }
         
-        #elevation-container { 
-            height: 190px; 
+        /* Conteneur principal du graphique (qui abrite aussi le bouton) */
+        #elevation-outer {
+            height: 240px; 
             background: white; 
             border-top: 2px solid #ddd; 
-            padding: 10px 20px; 
+            position: relative;
+            display: none; /* Masqué au démarrage */
+        }
+
+        /* Bouton de bascule de vue */
+        #view-toggle-btn {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            z-index: 1000;
+            padding: 6px 12px;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: background 0.2s;
+        }
+        #view-toggle-btn:hover { background: #34495e; }
+
+        /* Conteneur défilant du graphique */
+        #elevation-container { 
+            height: 100%;
+            overflow-x: auto; 
+            overflow-y: hidden;
+            padding: 25px 10px 10px 10px;
             box-sizing: border-box;
-            display: none;
+        }
+        
+        .chart-wrapper { 
+            height: 100%; 
+            position: relative; 
+            padding: 0 15px;
         }
         
         h3 { margin: 0; font-size: 16px; color: #2c3e50; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 8px; }
@@ -73,8 +107,7 @@
             #main-container { flex-direction: column; }
             #controls-sidebar { width: 100%; min-width: 100%; height: 40vh; max-height: 40vh; }
             #map-container { height: 60vh; }
-            #elevation-container { height: 150px; padding: 5px 10px; }
-            .chart-wrapper { width: 100%; max-width: 800px; margin: 0 auto; height: 100%; position: relative; }
+            #elevation-outer { height: 180px; }
         }
     </style>
 </head>
@@ -137,11 +170,16 @@
         
         <div id="map-container">
             <div id="map"></div>
-            <div id="elevation-container">
-    <div class="chart-wrapper">
-        <canvas id="elevationChart"></canvas>
-    </div>
-</div>
+            
+            <!-- Conteneur global du profil avec le bouton de toggle intégré -->
+            <div id="elevation-outer">
+                <button id="view-toggle-btn">🔍 Ajuster à l'écran</button>
+                <div id="elevation-container">
+                    <div class="chart-wrapper">
+                        <canvas id="elevationChart"></canvas>
+                    </div>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -161,43 +199,19 @@
             return R * c;
         }
 
-        // 1. Les classiques
-        const planCarto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '© OpenStreetMap, © CARTO'
-        });
-        
-        // 2. OpenTopoMap (Excellent pour la randonnée, notre nouvelle carte par défaut)
-        const openTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-            maxZoom: 17,
-            attribution: '© OpenStreetMap contributors, SRTM | © OpenTopoMap'
-        });
+        // --- GESTION DES FONDS DE CARTE ---
+        const planCarto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '© OpenStreetMap, © CARTO' });
+        const openTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenStreetMap contributors | © OpenTopoMap' });
+        const ignPlan = L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}', { maxZoom: 19, attribution: '© IGN' });
+        const ignSatellite = L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}', { maxZoom: 19, attribution: '© IGN' });
+        const cyclosm = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', { maxZoom: 20, attribution: '© CyclOSM et OpenStreetMap contributors' });
 
-        // 3. IGN Plan (Plus épuré, très lisible pour les routes)
-        const ignPlan = L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}', {
-            maxZoom: 19,
-            attribution: '© IGN'
-        });
-
-        // 4. IGN Satellite (Vue aérienne haute résolution)
-        const ignSatellite = L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}', {
-            maxZoom: 19,
-            attribution: '© IGN'
-        });
-
-        // 5. CyclOSM (Très bon pour le VTT)
-        const cyclosm = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
-            maxZoom: 20,
-            attribution: '© CyclOSM et OpenStreetMap contributors'
-        });
-
-        // Initialisation de la carte 
         const map = L.map('map', {
-            center: [46.4632, 4.6582],
+            center: [46.4632, 4.6582], // Navour-sur-Grosne
             zoom: 13,
-            layers: [openTopo] // 👈 OpenTopoMap s'affiche par défaut !
+            layers: [openTopo] // OpenTopo par défaut
         });
 
-        // Le menu de sélection des cartes affiché en haut à droite
         const fondsDeCarte = { 
             "⛰️ OpenTopoMap": openTopo,
             "🇫🇷 IGN Plan": ignPlan,
@@ -205,8 +219,9 @@
             "🚲 CyclOSM (VTT/Vélo)": cyclosm,
             "🏙️ Plan standard": planCarto
         };
-        
         L.control.layers(fondsDeCarte, null, { collapsed: false }).addTo(map);
+
+        // --- VARIABLES GLOBALES ---
         let currentMode = 'auto';
         let drawingMethod = 'auto'; 
         let waypoints = []; 
@@ -216,14 +231,22 @@
         let currentAngleOffset = 0; 
         let globalCoordinates = []; 
         let coordinateMappingIndices = []; 
+        
         let totalCalculatedDistance = 0;
         let totalCalculatedDPlus = 0;
         let totalCalculatedDMoins = 0;
+        
         let elevationChart = null; 
+        let isFitView = false; // Gère l'état du toggle d'affichage
 
+        // Sauvegarde des données du graphique pour pouvoir le redessiner au toggle
+        let lastLabels = [];
+        let lastAltitudes = [];
+        let lastRawDistances = [];
         let datasetDPlusCumule = [];
         let datasetDMoinsCumule = [];
 
+        // --- ICONS ---
         const pointSuiviIcon = L.divIcon({
             className: 'custom-hover-point',
             html: '<div style="background-color: #3498db; width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; box-shadow: 0 0 6px rgba(0,0,0,0.4);"></div>',
@@ -240,14 +263,24 @@
             shadowSize: [41, 41]
         });
 
+        // --- CONTROLES UI ---
         const btnAuto = document.getElementById('btn-mode-auto');
         const btnManual = document.getElementById('btn-mode-manual');
         const slidersZone = document.getElementById('sliders-zone');
         const nextBtn = document.getElementById('next-btn');
         const routeBtn = document.getElementById('route-btn');
         const gpxBtn = document.getElementById('gpx-btn');
-        const elevationContainer = document.getElementById('elevation-container');
         const subDrawingModeContainer = document.getElementById('sub-drawing-mode');
+        const elevationOuter = document.getElementById('elevation-outer');
+        const viewToggleBtn = document.getElementById('view-toggle-btn');
+
+        viewToggleBtn.addEventListener('click', () => {
+            isFitView = !isFitView;
+            viewToggleBtn.innerText = isFitView ? "↔️ Vue Défilante" : "🔍 Ajuster à l'écran";
+            if (lastLabels.length > 0) {
+                dessinerProfilAltimetrique(lastLabels, lastAltitudes, lastRawDistances);
+            }
+        });
 
         btnAuto.addEventListener('click', () => {
             if(currentMode !== 'auto') {
@@ -307,6 +340,7 @@
         const distanceVal = document.getElementById('distance-val');
         distanceSlider.addEventListener('input', (e) => { distanceVal.innerText = `${e.target.value} km`; });
 
+        // --- LOGIQUE CARTE ---
         map.on('click', (e) => {
             const lat = e.latlng.lat;
             const lng = e.latlng.lng;
@@ -416,11 +450,8 @@
                 let ptActuel = segmentsAVisiter[i];
 
                 if (ptActuel.method === 'manual') {
-                    // MODIFICATION : Au lieu de tracer juste un point A et un point B
-                    // On interpole virtuellement un point tous les 50 mètres le long de la ligne droite
-                    // Cela donne de la matière pour que l'API Open-Meteo puisse lire les collines intermédiaires !
                     let distSegment = calculerDistanceEntreDeuxPoints(ptPrecedent.lat, ptPrecedent.lng, ptActuel.lat, ptActuel.lng);
-                    let nbEtapes = Math.max(1, Math.floor((distSegment * 1000) / 50)); // 1 point tous les 50m
+                    let nbEtapes = Math.max(1, Math.floor((distSegment * 1000) / 50)); 
                     
                     for(let etp = 1; etp <= nbEtapes; etp++) {
                         let fraction = etp / nbEtapes;
@@ -474,8 +505,7 @@
             if (coordinates3D.length === 0) return;
             document.getElementById('info').innerText = "Analyse altimétrique...";
 
-            // CORRECTION CRITIQUE : Fixation stricte pour respecter la limite de 100 points de l'API Open-Meteo
-            const maxPointsAPI = 80; // On laisse une marge de sécurité
+            const maxPointsAPI = 80; 
             let pas = Math.ceil(coordinates3D.length / maxPointsAPI); 
             
             let lats = [];
@@ -483,13 +513,11 @@
             let indexOrigine = [];
             
             for (let i = 0; i < coordinates3D.length; i += pas) {
-                // toFixed(5) allège la longueur de l'URL tout en gardant une précision métrique
                 lats.push(coordinates3D[i].lat.toFixed(5));
                 lngs.push(coordinates3D[i].lng.toFixed(5));
                 indexOrigine.push(i);
             }
             
-            // S'assurer qu'on garde bien le tout dernier point pour boucler la courbe
             if (indexOrigine[indexOrigine.length - 1] !== coordinates3D.length - 1) {
                 lats.push(coordinates3D[coordinates3D.length - 1].lat.toFixed(5));
                 lngs.push(coordinates3D[coordinates3D.length - 1].lng.toFixed(5));
@@ -516,8 +544,9 @@
                     smoothedElevations.push((p2 + p1 + curr + n1 + n2) / 5);
                 }
 
-                let labelsDistance = [0];
+                let labelsDistance = ["0.00"];
                 let donneesAltitude = [smoothedElevations[0]];
+                let rawDistances = [0]; // En mètres, vital pour le calcul de pente
                 let distanceAccumulee = 0;
                 
                 coordinateMappingIndices = [...indexOrigine];
@@ -527,7 +556,8 @@
                     let ptB = coordinates3D[indexOrigine[i]];
                     distanceAccumulee += calculerDistanceEntreDeuxPoints(ptA.lat, ptA.lng, ptB.lat, ptB.lng);
                     
-                    labelsDistance.push(distanceAccumulee.toFixed(1));
+                    labelsDistance.push(distanceAccumulee.toFixed(2));
+                    rawDistances.push(distanceAccumulee * 1000);
                     donneesAltitude.push(smoothedElevations[i]);
                 }
 
@@ -559,39 +589,49 @@
                 totalCalculatedDMoins = Math.round(dMoinsCumule);
 
                 afficherLigneSurCarte(coordinates3D, distanceTotalKm, totalCalculatedDPlus, totalCalculatedDMoins);
-                dessinerProfilAltimetrique(labelsDistance, donneesAltitude);
+                dessinerProfilAltimetrique(labelsDistance, donneesAltitude, rawDistances);
             })
             .catch(() => {
-                // S'il y a un plantage de l'API externe, on affiche quand même le trait rouge sur la carte 
                 afficherLigneSurCarte(coordinates3D, distanceTotalKm, 0, 0);
-                elevationContainer.style.display = "none";
+                elevationOuter.style.display = "none";
             });
         }
 
-        function dessinerProfilAltimetrique(labelsDistance, donneesAltitude) {
-            elevationContainer.style.display = "block"; 
+        function dessinerProfilAltimetrique(labelsDistance, donneesAltitude, rawDistances) {
+            elevationOuter.style.display = "block"; 
             map.invalidateSize(); 
 
-            if (elevationChart) {
-                elevationChart.destroy(); 
-            }
+            // Sauvegarde globale
+            lastLabels = labelsDistance;
+            lastAltitudes = donneesAltitude;
+            lastRawDistances = rawDistances;
 
-            // --- 🚀 OPTIMISATION : Calcul dynamique de l'échelle Y ---
+            if (elevationChart) { elevationChart.destroy(); }
+
+            // --- GESTION DE LA VUE DYNAMIQUE (Toggle) ---
+            let distanceTotale = parseFloat(labelsDistance[labelsDistance.length - 1]);
+            let conteneurLargeur = document.getElementById('elevation-container').clientWidth;
+            
+            // Si FitView est coché = Largeur de l'écran. Sinon = Largeur calculée (Scroll)
+            let largeurDynamique = isFitView ? conteneurLargeur : Math.max(conteneurLargeur, distanceTotale * 80); 
+            document.querySelector('.chart-wrapper').style.width = largeurDynamique + "px";
+
+            // --- ZOOM VERTICAL ---
             let minAlt = Math.min(...donneesAltitude);
             let maxAlt = Math.max(...donneesAltitude);
             let amplitude = maxAlt - minAlt;
+            let amplitudeVisuelle = Math.max(amplitude, 30); 
             
-            // Marge dynamique : 15% de l'amplitude, avec un minimum de 10m d'écart (si le parcours est plat)
-            let margeY = Math.max(10, amplitude * 0.15); 
-            
+            let margeY = amplitudeVisuelle * 0.10; 
             let yMin = Math.floor(minAlt - margeY);
-            let yMax = Math.ceil(maxAlt + margeY);
-            // ---------------------------------------------------------
+            let yMax = Math.ceil(minAlt + amplitudeVisuelle + margeY);
 
             const ctx = document.getElementById('elevationChart').getContext('2d');
-            let gradient = ctx.createLinearGradient(0, 0, 0, 140);
-            gradient.addColorStop(0, 'rgba(52, 152, 219, 0.35)');
-            gradient.addColorStop(1, 'rgba(52, 152, 219, 0.00)');
+            
+            // Ombre légère sous la courbe pour la lisibilité
+            let gradientFill = ctx.createLinearGradient(0, 0, 0, 240);
+            gradientFill.addColorStop(0, 'rgba(189, 195, 199, 0.4)');
+            gradientFill.addColorStop(1, 'rgba(189, 195, 199, 0.05)');
 
             elevationChart = new Chart(ctx, {
                 type: 'line',
@@ -600,13 +640,32 @@
                     datasets: [{
                         label: 'Altitude',
                         data: donneesAltitude,
-                        borderColor: '#3498db',
-                        borderWidth: 2,
-                        backgroundColor: gradient,
+                        borderWidth: 3, // Pinceau plus épais pour bien voir les couleurs
+                        backgroundColor: gradientFill,
                         fill: true,
                         tension: 0.3, 
                         pointRadius: 0, 
-                        pointHoverRadius: 5
+                        pointHoverRadius: 5,
+                        // --- 🚀 CODE COULEUR PAR POURCENTAGE DE PENTE (Heatmap) ---
+                        segment: {
+                            borderColor: context => {
+                                const i = context.p0DataIndex;
+                                if(i === undefined || !rawDistances[i+1]) return '#27ae60'; // Sécurité
+                                
+                                let dAlt = donneesAltitude[i+1] - donneesAltitude[i];
+                                let dDist = rawDistances[i+1] - rawDistances[i]; // Mètres parcourus
+                                
+                                if (dDist === 0) return '#27ae60'; // Evite la division par zéro
+                                
+                                // Calcul de la pente absolue
+                                let pentePourcentage = Math.abs((dAlt / dDist) * 100);
+
+                                if (pentePourcentage < 5) return '#2ecc71'; // Vert : 0% - 4.9%
+                                if (pentePourcentage < 10) return '#f39c12'; // Orange : 5% - 9.9%
+                                if (pentePourcentage < 15) return '#e74c3c'; // Rouge : 10% - 14.9%
+                                return '#111111'; // Noir : + de 15% (Les murs)
+                            }
+                        }
                     }]
                 },
                 options: {
@@ -624,8 +683,18 @@
                                     let alt = context.parsed.y;
                                     let dPlus = datasetDPlusCumule[idx] || 0;
                                     let dMoins = datasetDMoinsCumule[idx] || 0;
+                                    
+                                    // Calcul d'affichage ponctuel de la pente dans la bulle
+                                    let penteActuelleStr = "Plat";
+                                    if(idx < rawDistances.length - 1) {
+                                        let dA = donneesAltitude[idx+1] - alt;
+                                        let dD = rawDistances[idx+1] - rawDistances[idx];
+                                        if(dD > 0) penteActuelleStr = ((dA / dD) * 100).toFixed(1) + "%";
+                                    }
+
                                     return [
                                         ` Altitude : ${alt.toFixed(0)} m`,
+                                        ` Pente à ce point : ${penteActuelleStr}`,
                                         ` Cumul D+ : +${dPlus} m`,
                                         ` Cumul D- : -${dMoins} m`
                                     ];
@@ -651,11 +720,12 @@
                     scales: {
                         x: { 
                             grid: { display: false }, 
-                            title: { display: true, text: 'Distance (km)', font: { size: 11, weight: 'bold' } } 
+                            title: { display: true, text: 'Distance (km)', font: { size: 11, weight: 'bold' } },
+                            ticks: { maxTicksLimit: Math.max(10, Math.floor(largeurDynamique / 80)) } 
                         },
                         y: { 
-                            min: yMin, // 👈 Application du zoom vertical (Bas)
-                            max: yMax, // 👈 Application du zoom vertical (Haut)
+                            min: yMin, 
+                            max: yMax, 
                             title: { display: true, text: 'Altitude (m)', font: { size: 11, weight: 'bold' } } 
                         }
                     }
@@ -752,7 +822,7 @@
             nextBtn.disabled = true;
             gpxBtn.disabled = true;
             if (elevationChart) { elevationChart.destroy(); elevationChart = null; }
-            elevationContainer.style.display = "none";
+            elevationOuter.style.display = "none";
             map.invalidateSize();
         }
 
