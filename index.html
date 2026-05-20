@@ -158,23 +158,58 @@
             return R * c;
         }
 
+        // 1. Les classiques
         const planCarto = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-            attribution: '© OpenStreetMap contributors © CARTO'
+            attribution: '© OpenStreetMap, © CARTO'
         });
         
-        const carteTopoEsri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}', {
-            attribution: 'Tiles © Esri'
+        // 2. OpenTopoMap (Excellent pour la randonnée)
+        const openTopo = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+            maxZoom: 17,
+            attribution: '© OpenStreetMap contributors, SRTM | © OpenTopoMap'
         });
 
+        // 3. IGN Classique (Carte Topographique type TOP25)
+        const ignTopo = L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.MAPS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}', {
+            maxZoom: 18,
+            attribution: '© IGN'
+        });
+
+        // 4. IGN Plan (Plus épuré, très lisible pour les routes)
+        const ignPlan = L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&STYLE=normal&FORMAT=image/png&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}', {
+            maxZoom: 19,
+            attribution: '© IGN'
+        });
+
+        // 5. IGN Satellite (Vue aérienne haute résolution)
+        const ignSatellite = L.tileLayer('https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}', {
+            maxZoom: 19,
+            attribution: '© IGN'
+        });
+
+        // 6. CyclOSM (Très bon pour le VTT)
+        const cyclosm = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', {
+            maxZoom: 20,
+            attribution: '© CyclOSM et OpenStreetMap contributors'
+        });
+
+        // Initialisation de la carte (centrée vers Navour-sur-Grosne par défaut)
         const map = L.map('map', {
-            center: [46.4632, 4.6582], // Tu pourras changer pour centrer sur la Bourgogne
-            zoom: 12,
-            layers: [planCarto]
+            center: [46.4632, 4.6582],
+            zoom: 13,
+            layers: [ignTopo] // 👈 La carte IGN s'affiche par défaut !
         });
 
-        const fondsDeCarte = { "Plan standard (Carto)": planCarto, "Carte Topo & Relief (Esri)": carteTopoEsri };
+        // Le menu de sélection des cartes affiché en haut à droite
+        const fondsDeCarte = { 
+            "🇫🇷 IGN Topo 25": ignTopo,
+            "🇫🇷 IGN Plan": ignPlan,
+            "🇫🇷 IGN Satellite": ignSatellite,
+            "⛰️ OpenTopoMap": openTopo,
+            "🚲 CyclOSM (VTT/Vélo)": cyclosm,
+            "🏙️ Plan standard": planCarto
+        };
         L.control.layers(fondsDeCarte, null, { collapsed: false }).addTo(map);
-
         let currentMode = 'auto';
         let drawingMethod = 'auto'; 
         let waypoints = []; 
