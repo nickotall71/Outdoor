@@ -22,52 +22,77 @@
             overflow-y: auto; height: 100%;
         }
         
-        #map-container { flex: 1; display: flex; flex-direction: column; height: 100%; position: relative; }
+        /* VERROU 1 : On empêche le conteneur de la carte de s'étirer (min-width: 0) */
+        #map-container { flex: 1; display: flex; flex-direction: column; height: 100%; position: relative; min-width: 0; }
         #map { flex: 1; width: 100%; }
         
-        /* Conteneur principal du graphique (qui abrite aussi le bouton) */
+        /* 🚀 NOUVELLE STRUCTURE DU PROFIL ALTIMETRIQUE */
         #elevation-outer {
-            height: 240px; 
+            height: 260px; 
             background: white; 
             border-top: 2px solid #ddd; 
-            position: relative;
-            display: none; /* Masqué au démarrage */
+            display: none; 
+            flex-direction: column;
+            z-index: 1000;
+            /* VERROU 2 : On bloque la largeur à la taille de l'écran */
+            width: 100%; 
+            max-width: 100%;
         }
 
-        /* Bouton de bascule de vue */
+        #elevation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 15px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            width: 100%; 
+            box-sizing: border-box;
+        }
+        
+        #elevation-title {
+            font-size: 13px;
+            font-weight: bold;
+            color: #2c3e50;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .legende-pente { font-size: 11px; font-weight: normal; color: #7f8c8d; display: flex; gap: 8px; }
+        .dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; }
+
         #view-toggle-btn {
-            position: absolute;
-            top: 10px;
-            right: 15px;
-            z-index: 1000;
             padding: 6px 12px;
-            background: #2c3e50;
+            background: #34495e;
             color: white;
             border: none;
             border-radius: 4px;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: bold;
             cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             transition: background 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
-        #view-toggle-btn:hover { background: #34495e; }
+        #view-toggle-btn:hover { background: #2c3e50; }
 
-        /* Conteneur défilant du graphique */
         #elevation-container { 
-            height: 100%;
+            flex: 1;
+            /* VERROU 3 : Force la barre de scrolling en bloquant le débordement horizontal */
+            width: 100%;
+            max-width: 100%;
             overflow-x: auto; 
             overflow-y: hidden;
-            padding: 25px 10px 10px 10px;
+            padding: 15px 10px 10px 10px;
             box-sizing: border-box;
         }
         
         .chart-wrapper { 
             height: 100%; 
             position: relative; 
-            padding: 0 15px;
         }
-        
+        /* ------------------------------------------- */
+
         h3 { margin: 0; font-size: 16px; color: #2c3e50; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 8px; }
         
         .mode-selector { display: flex; gap: 4px; background: #f1f2f6; padding: 4px; border-radius: 6px; }
@@ -107,7 +132,8 @@
             #main-container { flex-direction: column; }
             #controls-sidebar { width: 100%; min-width: 100%; height: 40vh; max-height: 40vh; }
             #map-container { height: 60vh; }
-            #elevation-outer { height: 180px; }
+            #elevation-outer { height: 220px; }
+            .legende-pente { display: none; } /* On cache la légende sur mobile par manque de place */
         }
     </style>
 </head>
@@ -171,9 +197,21 @@
         <div id="map-container">
             <div id="map"></div>
             
-            <!-- Conteneur global du profil avec le bouton de toggle intégré -->
+            <!-- CONTENEUR DU PROFIL TOTALEMENT REFAIT -->
             <div id="elevation-outer">
-                <button id="view-toggle-btn">🔍 Ajuster à l'écran</button>
+                <div id="elevation-header">
+                    <div id="elevation-title">
+                        📊 Profil et Pentes
+                        <div class="legende-pente">
+                            <span><span class="dot" style="background:#2ecc71;"></span> Roulant</span>
+                            <span><span class="dot" style="background:#f39c12;"></span> Modéré</span>
+                            <span><span class="dot" style="background:#e74c3c;"></span> Difficile</span>
+                            <span><span class="dot" style="background:#111111;"></span> Mur</span>
+                        </div>
+                    </div>
+                    <!-- LE BOUTON APPARAIT ICI -->
+                    <button id="view-toggle-btn">🔍 Ajuster à l'écran</button>
+                </div>
                 <div id="elevation-container">
                     <div class="chart-wrapper">
                         <canvas id="elevationChart"></canvas>
@@ -207,9 +245,9 @@
         const cyclosm = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', { maxZoom: 20, attribution: '© CyclOSM et OpenStreetMap contributors' });
 
         const map = L.map('map', {
-            center: [46.4632, 4.6582], // Navour-sur-Grosne
+            center: [46.4632, 4.6582], 
             zoom: 13,
-            layers: [openTopo] // OpenTopo par défaut
+            layers: [openTopo] 
         });
 
         const fondsDeCarte = { 
@@ -237,9 +275,9 @@
         let totalCalculatedDMoins = 0;
         
         let elevationChart = null; 
-        let isFitView = false; // Gère l'état du toggle d'affichage
+        let isFitView = false; // Gère l'état du bouton
 
-        // Sauvegarde des données du graphique pour pouvoir le redessiner au toggle
+        // Sauvegarde des données pour redessiner le graph à la volée
         let lastLabels = [];
         let lastAltitudes = [];
         let lastRawDistances = [];
@@ -276,7 +314,7 @@
 
         viewToggleBtn.addEventListener('click', () => {
             isFitView = !isFitView;
-            viewToggleBtn.innerText = isFitView ? "↔️ Vue Défilante" : "🔍 Ajuster à l'écran";
+            viewToggleBtn.innerText = isFitView ? "↔️ Mettre en Vue Défilante" : "🔍 Ajuster à l'écran";
             if (lastLabels.length > 0) {
                 dessinerProfilAltimetrique(lastLabels, lastAltitudes, lastRawDistances);
             }
@@ -546,7 +584,7 @@
 
                 let labelsDistance = ["0.00"];
                 let donneesAltitude = [smoothedElevations[0]];
-                let rawDistances = [0]; // En mètres, vital pour le calcul de pente
+                let rawDistances = [0]; 
                 let distanceAccumulee = 0;
                 
                 coordinateMappingIndices = [...indexOrigine];
@@ -598,23 +636,31 @@
         }
 
         function dessinerProfilAltimetrique(labelsDistance, donneesAltitude, rawDistances) {
-            elevationOuter.style.display = "block"; 
+            // Affichage du bloc global EN FLEX pour voir le header
+            elevationOuter.style.display = "flex"; 
             map.invalidateSize(); 
 
-            // Sauvegarde globale
+            // Sauvegarde pour le basculement FitView / ScrollView
             lastLabels = labelsDistance;
             lastAltitudes = donneesAltitude;
             lastRawDistances = rawDistances;
 
             if (elevationChart) { elevationChart.destroy(); }
 
-            // --- GESTION DE LA VUE DYNAMIQUE (Toggle) ---
+            // --- GESTION DU SCROLL OU FIT VIEW ---
             let distanceTotale = parseFloat(labelsDistance[labelsDistance.length - 1]);
-            let conteneurLargeur = document.getElementById('elevation-container').clientWidth;
             
-            // Si FitView est coché = Largeur de l'écran. Sinon = Largeur calculée (Scroll)
-            let largeurDynamique = isFitView ? conteneurLargeur : Math.max(conteneurLargeur, distanceTotale * 80); 
-            document.querySelector('.chart-wrapper').style.width = largeurDynamique + "px";
+            // On calcule la largeur max disponible de la fenêtre
+            let conteneurLargeur = document.getElementById('elevation-outer').clientWidth;
+            if (conteneurLargeur === 0) conteneurLargeur = window.innerWidth - 340; 
+            
+            // Le ratio ultime : on force 120 pixels pour chaque kilomètre !
+            let largeurCalculee = distanceTotale * 120;
+            
+            let targetWidth = isFitView ? conteneurLargeur : Math.max(conteneurLargeur, largeurCalculee); 
+            
+            // On applique la nouvelle largeur
+            document.querySelector('.chart-wrapper').style.width = targetWidth + "px";
 
             // --- ZOOM VERTICAL ---
             let minAlt = Math.min(...donneesAltitude);
@@ -627,8 +673,6 @@
             let yMax = Math.ceil(minAlt + amplitudeVisuelle + margeY);
 
             const ctx = document.getElementById('elevationChart').getContext('2d');
-            
-            // Ombre légère sous la courbe pour la lisibilité
             let gradientFill = ctx.createLinearGradient(0, 0, 0, 240);
             gradientFill.addColorStop(0, 'rgba(189, 195, 199, 0.4)');
             gradientFill.addColorStop(1, 'rgba(189, 195, 199, 0.05)');
@@ -640,30 +684,28 @@
                     datasets: [{
                         label: 'Altitude',
                         data: donneesAltitude,
-                        borderWidth: 3, // Pinceau plus épais pour bien voir les couleurs
+                        borderWidth: 3, 
                         backgroundColor: gradientFill,
                         fill: true,
                         tension: 0.3, 
                         pointRadius: 0, 
                         pointHoverRadius: 5,
-                        // --- 🚀 CODE COULEUR PAR POURCENTAGE DE PENTE (Heatmap) ---
                         segment: {
                             borderColor: context => {
                                 const i = context.p0DataIndex;
-                                if(i === undefined || !rawDistances[i+1]) return '#27ae60'; // Sécurité
+                                if(i === undefined || rawDistances[i+1] === undefined) return '#27ae60'; 
                                 
                                 let dAlt = donneesAltitude[i+1] - donneesAltitude[i];
-                                let dDist = rawDistances[i+1] - rawDistances[i]; // Mètres parcourus
+                                let dDist = rawDistances[i+1] - rawDistances[i]; 
                                 
-                                if (dDist === 0) return '#27ae60'; // Evite la division par zéro
+                                if (dDist <= 0) return '#27ae60'; 
                                 
-                                // Calcul de la pente absolue
                                 let pentePourcentage = Math.abs((dAlt / dDist) * 100);
 
-                                if (pentePourcentage < 5) return '#2ecc71'; // Vert : 0% - 4.9%
-                                if (pentePourcentage < 10) return '#f39c12'; // Orange : 5% - 9.9%
-                                if (pentePourcentage < 15) return '#e74c3c'; // Rouge : 10% - 14.9%
-                                return '#111111'; // Noir : + de 15% (Les murs)
+                                if (pentePourcentage < 5) return '#2ecc71'; // Vert : < 5%
+                                if (pentePourcentage < 10) return '#f39c12'; // Orange : 5 à 10%
+                                if (pentePourcentage < 15) return '#e74c3c'; // Rouge : 10 à 15%
+                                return '#111111'; // Noir : +15%
                             }
                         }
                     }]
@@ -671,6 +713,7 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    animation: { duration: 0 }, // Coupe l'animation pour un redimensionnement instantané
                     plugins: { 
                         legend: { display: false },
                         tooltip: {
@@ -684,7 +727,6 @@
                                     let dPlus = datasetDPlusCumule[idx] || 0;
                                     let dMoins = datasetDMoinsCumule[idx] || 0;
                                     
-                                    // Calcul d'affichage ponctuel de la pente dans la bulle
                                     let penteActuelleStr = "Plat";
                                     if(idx < rawDistances.length - 1) {
                                         let dA = donneesAltitude[idx+1] - alt;
@@ -721,7 +763,7 @@
                         x: { 
                             grid: { display: false }, 
                             title: { display: true, text: 'Distance (km)', font: { size: 11, weight: 'bold' } },
-                            ticks: { maxTicksLimit: Math.max(10, Math.floor(largeurDynamique / 80)) } 
+                            ticks: { maxTicksLimit: Math.max(10, Math.floor(targetWidth / 80)) } 
                         },
                         y: { 
                             min: yMin, 
