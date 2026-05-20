@@ -74,6 +74,7 @@
             #controls-sidebar { width: 100%; min-width: 100%; height: 40vh; max-height: 40vh; }
             #map-container { height: 60vh; }
             #elevation-container { height: 150px; padding: 5px 10px; }
+            .chart-wrapper { width: 100%; max-width: 800px; margin: 0 auto; height: 100%; position: relative; }
         }
     </style>
 </head>
@@ -137,8 +138,10 @@
         <div id="map-container">
             <div id="map"></div>
             <div id="elevation-container">
-                <canvas id="elevationChart"></canvas>
-            </div>
+    <div class="chart-wrapper">
+        <canvas id="elevationChart"></canvas>
+    </div>
+</div>
         </div>
 
     </div>
@@ -573,6 +576,18 @@
                 elevationChart.destroy(); 
             }
 
+            // --- 🚀 OPTIMISATION : Calcul dynamique de l'échelle Y ---
+            let minAlt = Math.min(...donneesAltitude);
+            let maxAlt = Math.max(...donneesAltitude);
+            let amplitude = maxAlt - minAlt;
+            
+            // Marge dynamique : 15% de l'amplitude, avec un minimum de 10m d'écart (si le parcours est plat)
+            let margeY = Math.max(10, amplitude * 0.15); 
+            
+            let yMin = Math.floor(minAlt - margeY);
+            let yMax = Math.ceil(maxAlt + margeY);
+            // ---------------------------------------------------------
+
             const ctx = document.getElementById('elevationChart').getContext('2d');
             let gradient = ctx.createLinearGradient(0, 0, 0, 140);
             gradient.addColorStop(0, 'rgba(52, 152, 219, 0.35)');
@@ -634,8 +649,15 @@
                         }
                     },
                     scales: {
-                        x: { grid: { display: false }, title: { display: true, text: 'Distance (km)', font: { size: 11, weight: 'bold' } } },
-                        y: { title: { display: true, text: 'Altitude (m)', font: { size: 11, weight: 'bold' } } }
+                        x: { 
+                            grid: { display: false }, 
+                            title: { display: true, text: 'Distance (km)', font: { size: 11, weight: 'bold' } } 
+                        },
+                        y: { 
+                            min: yMin, // 👈 Application du zoom vertical (Bas)
+                            max: yMax, // 👈 Application du zoom vertical (Haut)
+                            title: { display: true, text: 'Altitude (m)', font: { size: 11, weight: 'bold' } } 
+                        }
                     }
                 }
             });
