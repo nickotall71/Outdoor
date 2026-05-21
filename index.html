@@ -83,6 +83,7 @@
             padding: 15px 10px 10px 10px;
             box-sizing: border-box;
         }
+        #import-gpx-btn { background: #9b59b6; }
         
         .chart-wrapper { 
             height: 100%; 
@@ -181,7 +182,9 @@
                 <button id="route-btn" class="action-btn" disabled>Générer le tracé</button>
                 <button id="next-btn" class="action-btn" disabled>🔄 Varier le parcours auto</button>
                 <button id="gpx-btn" class="action-btn" disabled>💾 Exporter en fichier GPX</button>
-                
+                <!-- Dans la div .btn-stack, après le bouton gpx-btn -->
+<button id="import-gpx-btn" class="action-btn">📂 Importer fichier GPX</button>
+<input type="file" id="gpx-file-input" accept=".gpx" style="display: none;">
                 <div class="sub-btn-grid">
                     <button id="undo-btn" class="action-btn">↩️ Annuler</button>
                     <button id="reset-btn" class="action-btn">❌ Reset</button>
@@ -814,6 +817,75 @@
         document.getElementById('reset-btn').addEventListener('click', () => {
             nettoyerCarte(); document.getElementById('info').innerText = "📍 Cliquez sur la carte pour poser votre point de départ.";
         });
+
+        // --- IMPORT GPX ---
+const importGpxBtn = document.getElementById('import-gpx-btn');
+const gpxFileInput = document.getElementById('gpx-file-input');
+
+importGpxBtn.addEventListener('click', () => gpxFileInput.click());
+
+gpxFileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    document.getElementById('info').innerText = "⏳ Lecture du fichier GPX...";
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+        try {
+            const gpxText = event.target.result;
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(gpxText, "text/xml");
+
+            // Extraction des points de trace (trkpt)
+            const trkpts = xmlDoc.getElementsByTagName("trkpt");
+            if (trkpts.length === 0) {
+                throw new Error("Aucun point de trace (trkpt) trouvé dans le GPX.");
+            }
+
+            // Nettoyage de la carte avant import
+            nettoyerCarte();
+
+            // Récupération des coordonnées et altitudes
+            let importedCoordinates = [];
+            for (let i = 0; i < trkpts.length; i++) {
+                const lat = parseFloat(trkpts[i].getAttribute("lat"));
+                const lng = parseFloat(trkpts[i].getAttribute("lon"));
+                const ele = parseFloat(trkpts[i].getElementsByTagName("ele")[0]?.textContent) || null;
+                importedCoordinates.push({ lat, lng, alt: ele });
+            }
+
+            // Affichage du tracé et calcul du profil
+            if (importedCoordinates.length > 0) {
+                // Création d'un waypoint pour le départ (pour la compatibilité avec l'UI)
+                waypoints.push({
+                    lat: importedCoordinates[0].lat,
+                    lng: importedCoordinates[0].lng,
+                    method: 'auto'
+                });
+                reconstruireMarqueurs();
+
+                // Calcul de la distance totale pour l'affichage
+                let totalDistance = 0;
+                for (let i = 1; i < importedCoordinates.length; i++) {
+                    totalDistance += calculerDistanceEntreDeuxPoints(
+                        importedCoordinates[i-1].lat, importedCoordinates[i-1].lng,
+                        importedCoordinates[i].lat, importedCoordinates[i].lng
+                    );
+                }
+
+                // Traitement du relief (comme pour un tracé généré)
+                traiterReliefDepuisTracé(importedCoordinates, totalDistance);
+            }
+        } catch (error) {
+            document.getElementById('info').innerText = `❌ Erreur: ${error.message || "Fichier GPX invalide."}`;
+            nettoyerCarte();
+        } finally {
+            gpxFileInput.value = ""; // Réinitialisation de l'input
+        }
+    };
+    reader.readAsText(file);
+});
     </script>
 </body>
 </html>
