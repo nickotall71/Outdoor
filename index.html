@@ -266,6 +266,30 @@
         let drawingMethod = 'auto'; 
         let waypoints = []; 
         let markersGroup = L.layerGroup().addTo(map);
+        // Layer group dédié aux marqueurs spéciaux (départ/arrivée/sommets)
+let specialMarkersGroup = L.layerGroup().addTo(map);
+
+// --- ICÔNES PERSONNALISÉES ---
+const startIcon = L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="background: #2ecc71; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 0 12px rgba(0,0,0,0.6); font-size: 14px;">D</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14]
+});
+
+const endIcon = L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="background: #e74c3c; width: 28px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 0 12px rgba(0,0,0,0.6); font-size: 14px; transform: rotate(45deg);"><span style="transform: rotate(-45deg); display: inline-block;">🏁</span></div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14]
+});
+
+const summitIcon = L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="background: #f39c12; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 0 12px rgba(0,0,0,0.6); font-size: 14px;">⛰️</div>`,
+    iconSize: [28, 28],
+    iconAnchor: [14, 14]
+});
         let routeLayer = null; 
         let hoverMarker = null; 
         let currentAngleOffset = 0; 
@@ -676,48 +700,121 @@
             });
         }
 
-        // Trace les segments Heatmap sur la carte
-        function afficherLigneSurCarte(coordinates, distanceTotalKm, dPlus, dMoins, indexOrigine = [], donneesAltitude = [], rawDistances = []) {
-            globalCoordinates = coordinates;
-            totalCalculatedDistance = distanceTotalKm;
-            totalCalculatedDPlus = dPlus;
-            totalCalculatedDMoins = dMoins;
+       // Trace les segments sur la carte + marqueurs spéciaux
+function afficherLigneSurCarte(coordinates, distanceTotalKm, dPlus, dMoins, indexOrigine = [], donneesAltitude = [], rawDistances = []) {
+    globalCoordinates = coordinates;
+    totalCalculatedDistance = distanceTotalKm;
+    totalCalculatedDPlus = dPlus;
+    totalCalculatedDMoins = dMoins;
 
-            if (routeLayer) map.removeLayer(routeLayer);
-            routeLayer = L.featureGroup().addTo(map);
+    // Nettoyage des marqueurs spéciaux (départ/arrivée/sommets)
+    specialMarkersGroup.clearLayers();
 
-            if (!indexOrigine || indexOrigine.length === 0) {
-                const leafletCoords = coordinates.map(pt => [pt.lat, pt.lng]);
-                L.polyline(leafletCoords, { color: '#2980b9', weight: 5, opacity: 0.9 }).addTo(routeLayer);
-            } else {
-                for (let i = 0; i < indexOrigine.length - 1; i++) {
-                    let idxStart = indexOrigine[i];
-                    let idxEnd = indexOrigine[i+1];
+    if (routeLayer) map.removeLayer(routeLayer);
+    routeLayer = L.featureGroup().addTo(map);
 
-                    let chunkCoords = [];
-                    for (let j = idxStart; j <= idxEnd; j++) {
-                        chunkCoords.push([coordinates[j].lat, coordinates[j].lng]);
+    // --- TRACÉ DES SEGMENTS (coloriés selon la pente) ---
+    if (!indexOrigine || indexOrigine.length === 0) {
+        // Cas sans indexOrigine (tracé simple)
+        const leafletCoords = coordinates.map(pt => [pt.lat, pt.lng]);
+        L.polyline(leafletCoords, { color: '#2980b9', weight: 5, opacity: 0.9 }).addTo(routeLayer);
+    } else {
+        // Cas avec indexOrigine (tracé segmenté avec couleurs de pente)
+        for (let i = 0; i < indexOrigine.length - 1; i++) {
+            let idxStart = indexOrigine[i];
+            let idxEnd = indexOrigine[i+1];
+            let chunkCoords = [];
+            for (let j = idxStart; j <= idxEnd; j++) {
+                chunkCoords.push([coordinates[j].lat, coordinates[j].lng]);
+            }
+            // Calcul de la pente pour ce segment
+            let idxPrev = Math.max(0, i - 1);
+            let idxNext = Math.min(donneesAltitude.length - 1, i + 1);
+            let dAlt = donneesAltitude[idxNext] - donneesAltitude[idxPrev];
+            let dDist = rawDistances[idxNext] - rawDistances[idxPrev];
+            let pentePourcentage = dDist > 0 ? Math.abs((dAlt / dDist) * 100) : 0;
+            let couleurSegment = getCouleurPente(pentePourcentage);
+            L.polyline(chunkCoords, { color: couleurSegment, weight: 6, opacity: 1 }).addTo(routeLayer);
+        }
+    }
+
+    // --- MARQUEURS SPÉCIAUX (départ, arrivée, sommets) ---
+    if (coordinates.length > 0) {
+        // 1️⃣ DÉPART (toujours le premier point)
+        L.marker([coordinates[0].lat, coordinates[0].lng], {
+            icon: startIcon,
+            zIndexOffset: 1000
+        }).addTo(specialMarkersGroup).bindPopup("<b>📍 Départ</b>");
+
+        // 2️⃣ ARRIVÉE (dernier point, si différent du départ)
+        if (coordinates.length > 1) {
+            const lastCoord = coordinates[coordinates.length - 1];
+            if (lastCoord.lat !== coordinates[0].lat || lastCoord.lng !== coordinates[0].lng) {
+                L.marker([lastCoord.lat, lastCoord.lng], {
+                    icon: endIcon,
+                    zIndexOffset: 1000
+                }).addTo(specialMarkersGroup).bindPopup("<b>🏁 Arrivée</b>");
+            }
+        }
+
+        // 3️⃣ SOMMETS (point le plus haut + points après montée significative)
+        if (donneesAltitude && donneesAltitude.length > 2 && rawDistances && rawDistances.length > 2) {
+            // --- POINT LE PLUS HAUT (toujours affiché) ---
+            const maxAlt = Math.max(...donneesAltitude);
+            const maxIndex = donneesAltitude.indexOf(maxAlt);
+            const maxSummitIndex = indexOrigine[maxIndex] !== undefined ? indexOrigine[maxIndex] : maxIndex;
+            L.marker([coordinates[maxSummitIndex].lat, coordinates[maxSummitIndex].lng], {
+                icon: summitIcon,
+                zIndexOffset: 1000
+            }).addTo(specialMarkersGroup)
+              .bindPopup(`<b>⛰️ Point le plus haut</b><br>Altitude: ${Math.round(maxAlt)} m`);
+
+            // --- AUTRES POINTS HAUTS (après montée significative) ---
+            const MIN_DISTANCE = 500;   // 500m entre chaque marqueur
+            const MIN_ELEVATION = 30;    // 30m de dénivelé minimum
+            const PEAK_THRESHOLD = 10;   // 10m pour considérer un pic local
+
+            let lastMarkerIndex = -1;
+            let lastMarkerAlt = donneesAltitude[0];
+            let lastMarkerDist = 0;
+
+            for (let i = 1; i < donneesAltitude.length - 1; i++) {
+                const prevAlt = donneesAltitude[i-1];
+                const currAlt = donneesAltitude[i];
+                const nextAlt = donneesAltitude[i+1];
+                const currDist = rawDistances[i];
+
+                // 1. Est-ce un pic local ?
+                if (currAlt > prevAlt + PEAK_THRESHOLD && currAlt > nextAlt + PEAK_THRESHOLD) {
+                    const summitIndex = indexOrigine[i] !== undefined ? indexOrigine[i] : i;
+
+                    // 2. Est-ce assez éloigné ET avec assez de dénivelé depuis le dernier marqueur ?
+                    if (lastMarkerIndex === -1 ||
+                        (currDist - lastMarkerDist >= MIN_DISTANCE &&
+                         currAlt - lastMarkerAlt >= MIN_ELEVATION)) {
+
+                        L.marker([coordinates[summitIndex].lat, coordinates[summitIndex].lng], {
+                            icon: summitIcon,
+                            zIndexOffset: 1000
+                        }).addTo(specialMarkersGroup)
+                          .bindPopup(`<b>⛰️ Point haut</b><br>Altitude: ${Math.round(currAlt)} m`);
+
+                        lastMarkerIndex = i;
+                        lastMarkerAlt = currAlt;
+                        lastMarkerDist = currDist;
                     }
-
-                    // Calcul de pente cohérent avec le graphique
-                    let idxPrev = Math.max(0, i - 1);
-                    let idxNext = Math.min(donneesAltitude.length - 1, i + 1);
-                    let dAlt = donneesAltitude[idxNext] - donneesAltitude[idxPrev];
-                    let dDist = rawDistances[idxNext] - rawDistances[idxPrev]; 
-                    
-                    let pentePourcentage = dDist > 0 ? Math.abs((dAlt / dDist) * 100) : 0;
-                    let couleurSegment = getCouleurPente(pentePourcentage);
-
-                    L.polyline(chunkCoords, { color: couleurSegment, weight: 6, opacity: 1 }).addTo(routeLayer);
                 }
             }
-            
-            let bounds = routeLayer.getBounds();
-            map.fitBounds(bounds, { maxZoom: map.getZoom(), padding: [20, 20] });
-
-            gpxBtn.disabled = false;
-            calculEstimationDuree();
         }
+    }
+
+    // Centrage de la carte
+    let bounds = routeLayer.getBounds();
+    map.fitBounds(bounds, { maxZoom: map.getZoom(), padding: [20, 20] });
+
+    gpxBtn.disabled = false;
+    calculEstimationDuree();
+}
 
         // Sync souris de la carte vers le profil altimétrique
         map.on('mousemove', (e) => {
@@ -778,16 +875,18 @@
 
         // --- RESET ET EXPORT ---
         function nettoyerCarte() {
-            waypoints = []; markersGroup.clearLayers();
-            if (routeLayer) map.removeLayer(routeLayer);
-            if (hoverMarker) { map.removeLayer(hoverMarker); hoverMarker = null; }
-            totalCalculatedDistance = 0; totalCalculatedDPlus = 0; totalCalculatedDMoins = 0;
-            globalCoordinates = []; coordinateMappingIndices = []; datasetDPlusCumule = []; datasetDMoinsCumule = [];
-            routeBtn.disabled = true; nextBtn.disabled = true; gpxBtn.disabled = true;
-            if (elevationChart) { elevationChart.destroy(); elevationChart = null; }
-            elevationOuter.style.display = "none";
-            map.invalidateSize();
-        }
+    waypoints = [];
+    markersGroup.clearLayers();
+    specialMarkersGroup.clearLayers(); // Nettoyage des marqueurs spéciaux
+    if (routeLayer) map.removeLayer(routeLayer);
+    if (hoverMarker) { map.removeLayer(hoverMarker); hoverMarker = null; }
+    totalCalculatedDistance = 0; totalCalculatedDPlus = 0; totalCalculatedDMoins = 0;
+    globalCoordinates = []; coordinateMappingIndices = []; datasetDPlusCumule = []; datasetDMoinsCumule = [];
+    routeBtn.disabled = true; nextBtn.disabled = true; gpxBtn.disabled = true;
+    if (elevationChart) { elevationChart.destroy(); elevationChart = null; }
+    elevationOuter.style.display = "none";
+    map.invalidateSize();
+}
 
         function calculEstimationDuree() {
             if (totalCalculatedDistance === 0) return;
