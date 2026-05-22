@@ -445,14 +445,21 @@ const summitIcon = L.divIcon({
                     const cap = (distanceChoisie / 2) * 0.0065 * 0.72 * facteurEchelle;
                     segmentsAVisiter.push({ lat: start.lat + cap * Math.cos(currentAngleOffset), lng: start.lng + cap * Math.sin(currentAngleOffset), method: 'auto' });
                 } else {
-                    const rayon = (distanceChoisie / 4) * 0.0072 * 0.68 * facteurEchelle;
-                    segmentsAVisiter.push({ lat: start.lat + rayon * Math.cos(currentAngleOffset), lng: start.lng + rayon * Math.sin(currentAngleOffset), method: 'auto' });
-                    segmentsAVisiter.push({ lat: start.lat + rayon * Math.cos(currentAngleOffset + 0.8), lng: start.lng + rayon * Math.sin(currentAngleOffset + 0.8), method: 'auto' });
-                    segmentsAVisiter.push({ lat: start.lat + rayon * Math.cos(currentAngleOffset + 1.6), lng: start.lng + rayon * Math.sin(currentAngleOffset + 1.6), method: 'auto' });
-                    segmentsAVisiter.push({lat: start.lat, lng: start.lng, method: 'auto'});
-                }
-            }
+                    const rayon = (distanceChoisie / (2 * Math.PI)) * 0.008 * facteurEchelle; // Circonférence = distanceChoisie
+            const nbPoints = 6; // 6 points pour une forme hexagonale naturelle
 
+            for (let i = 1; i <= nbPoints; i++) {
+                const angle = currentAngleOffset + (2 * Math.PI * i / nbPoints);
+                segmentsAVisiter.push({
+                    lat: start.lat + rayon * Math.cos(angle),
+                    lng: start.lng + rayon * Math.sin(angle),
+                    method: 'auto'
+                });
+            }
+            // Retour au départ pour fermer la boucle
+            segmentsAVisiter.push({lat: start.lat, lng: start.lng, method: 'auto'});
+        }
+    }
             document.getElementById('info').innerText = "Calcul du tracé...";
             let fullCoordinates = [];
             let distanceTotaleCumulee = 0;
@@ -505,6 +512,7 @@ const summitIcon = L.divIcon({
         }
 
         // 🚀 GESTION AVANCEE DU RELIEF (OPTIMISÉ POUR LES LONGS PARCOURS)
+// 🚀 GESTION AVANCEE DU RELIEF (OPTIMISÉ POUR LES LONGS PARCOURS)
 function traiterReliefDepuisTracé(coordinates3D, distanceTotalKm) {
     if (coordinates3D.length === 0) return;
     document.getElementById('info').innerText = "Analyse altimétrique en cours...";
