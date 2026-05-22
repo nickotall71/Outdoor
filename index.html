@@ -504,88 +504,148 @@ const summitIcon = L.divIcon({
             }
         }
 
-        // 🚀 GESTION AVANCEE DU RELIEF (CHUNKING ET LISSAGE NERVEUX)
-        function traiterReliefDepuisTracé(coordinates3D, distanceTotalKm) {
-            if (coordinates3D.length === 0) return;
-            document.getElementById('info').innerText = "Analyse altimétrique haute précision...";
+        // 🚀 GESTION AVANCEE DU RELIEF (OPTIMISÉ POUR LES LONGS PARCOURS)
+function traiterReliefDepuisTracé(coordinates3D, distanceTotalKm) {
+    if (coordinates3D.length === 0) return;
+    document.getElementById('info').innerText = "Analyse altimétrique en cours...";
 
-            const maxPointsAPI = 80; 
-            let lats = []; let lngs = []; let indexOrigine = [];
-            
-            // Echantillonnage tous les ~30 mètres (au lieu de diviser par 80)
-            let lastPt = coordinates3D[0];
-            indexOrigine.push(0); lats.push(lastPt.lat.toFixed(5)); lngs.push(lastPt.lng.toFixed(5));
+    const maxPointsAPI = 80; // Limite Open-Meteo
+    let lats = [];
+    let lngs = [];
+    let indexOrigine = [];
 
-            for (let i = 1; i < coordinates3D.length; i++) {
-                let d = calculerDistanceEntreDeuxPoints(lastPt.lat, lastPt.lng, coordinates3D[i].lat, coordinates3D[i].lng);
-                if (d >= 0.03 || i === coordinates3D.length - 1) { 
-                    lastPt = coordinates3D[i];
-                    indexOrigine.push(i);
-                    lats.push(lastPt.lat.toFixed(5));
-                    lngs.push(lastPt.lng.toFixed(5));
-                }
-            }
+    // 📏 ÉCHANTILLONNAGE ADAPTATIF (en km)
+    // Plus le parcours est long, plus on espace les points pour l'API
+    let samplingDistanceKm;
+    if (distanceTotalKm < 10) samplingDistanceKm = 0.03;   // 30m  (précision max)
+    else if (distanceTotalKm < 25) samplingDistanceKm = 0.05; // 50m
+    else if (distanceTotalKm < 50) samplingDistanceKm = 0.10; // 100m
+    else samplingDistanceKm = 0.20;                         // 200m (pour 50km+)
 
-            // Découpage en paquets de 80 points (Chunking) pour ne jamais faire planter l'API
-            let fetchPromises = [];
-            for (let i = 0; i < lats.length; i += maxPointsAPI) {
+    // Échantillonnage intelligent (garantit au moins 1 point tous les 200m pour le profil)
+    let lastPt = coordinates3D[0];
+    indexOrigine.push(0);
+    lats.push(lastPt.lat.toFixed(5));
+    lngs.push(lastPt.lng.toFixed(5));
+
+    for (let i = 1; i < coordinates3D.length; i++) {
+        let d = calculerDistanceEntreDeuxPoints(
+            lastPt.lat, lastPt.lng,
+            coordinates3D[i].lat, coordinates3D[i].lng
+        );
+        // On force un point tous les 200m MAX pour garder un profil lisible
+        if (d >= samplingDistanceKm || i === coordinates3D.length - 1) {
+            lastPt = coordinates3D[i];
+            indexOrigine.push(i);
+            lats.push(lastPt.lat.toFixed(5));
+            lngs.push(lastPt.lng.toFixed(5));
+        }
+    }
+
+    // ⏳ CHUNKING + DÉLAI ENTRE REQUÊTES (évite la saturation API)
+    let fetchPromises = [];
+    for (let i = 0; i < lats.length; i += maxPointsAPI) {
+        // Délai progressif : 100ms par lot (évite les erreurs 429)
+        const delayMs = Math.floor(i / maxPointsAPI) * 100;
+
+        fetchPromises.push(
+            new Promise(resolve => setTimeout(resolve, delayMs))
+            .then(() => {
                 let chunkLats = lats.slice(i, i + maxPointsAPI).join(',');
                 let chunkLngs = lngs.slice(i, i + maxPointsAPI).join(',');
                 let urlElevation = `https://api.open-meteo.com/v1/elevation?latitude=${chunkLats}&longitude=${chunkLngs}`;
-                
-                fetchPromises.push(
-                    fetch(urlElevation).then(res => {
-                        if(!res.ok) throw new Error("API Limit");
-                        return res.json();
-                    })
-                );
-            }
-
-            Promise.all(fetchPromises)
-            .then(results => {
-                let rawElevations = [];
-                results.forEach(data => {
-                    if (data.elevation) rawElevations = rawElevations.concat(data.elevation);
-                });
-
-                // LISSAGE NERVEUX (sur 3 points au lieu de 5, avec plus de poids au centre)
-                let smoothedElevations = [];
-                for (let i = 0; i < rawElevations.length; i++) {
-                    let p1 = rawElevations[Math.max(0, i - 1)]; 
-                    let curr = rawElevations[i];
-                    let n1 = rawElevations[Math.min(rawElevations.length - 1, i + 1)]; 
-                    smoothedElevations.push((p1 + curr * 2 + n1) / 4);
-                }
-
-                let labelsDistance = ["0.00"]; let donneesAltitude = [smoothedElevations[0]]; let rawDistances = [0]; 
-                let distanceAccumulee = 0; coordinateMappingIndices = [...indexOrigine];
-
-                for (let i = 1; i < smoothedElevations.length; i++) {
-                    let ptA = coordinates3D[indexOrigine[i - 1]]; let ptB = coordinates3D[indexOrigine[i]];
-                    distanceAccumulee += calculerDistanceEntreDeuxPoints(ptA.lat, ptA.lng, ptB.lat, ptB.lng);
-                    labelsDistance.push(distanceAccumulee.toFixed(2)); rawDistances.push(distanceAccumulee * 1000); donneesAltitude.push(smoothedElevations[i]);
-                }
-
-                let dPlusCumule = 0; let dMoinsCumule = 0; datasetDPlusCumule = [0]; datasetDMoinsCumule = [0];
-                let derniereAltitudeValide = donneesAltitude[0]; const SEUIL_AUTONOME = 6.0; 
-
-                for (let k = 1; k < donneesAltitude.length; k++) {
-                    let delta = donneesAltitude[k] - derniereAltitudeValide;
-                    if (delta >= SEUIL_AUTONOME) { dPlusCumule += delta; derniereAltitudeValide = donneesAltitude[k]; } 
-                    else if (delta <= -SEUIL_AUTONOME) { dMoinsCumule += Math.abs(delta); derniereAltitudeValide = donneesAltitude[k]; }
-                    datasetDPlusCumule.push(Math.round(dPlusCumule)); datasetDMoinsCumule.push(Math.round(dMoinsCumule));
-                }
-
-                totalCalculatedDPlus = Math.round(dPlusCumule); totalCalculatedDMoins = Math.round(dMoinsCumule);
-
-                afficherLigneSurCarte(coordinates3D, distanceTotalKm, totalCalculatedDPlus, totalCalculatedDMoins, indexOrigine, donneesAltitude, rawDistances);
-                dessinerProfilAltimetrique(labelsDistance, donneesAltitude, rawDistances);
+                return fetch(urlElevation);
             })
-            .catch(() => {
-                afficherLigneSurCarte(coordinates3D, distanceTotalKm, 0, 0);
-                elevationOuter.style.display = "none";
-            });
+            .then(res => {
+                if (!res.ok) throw new Error(`API Error: ${res.status}`);
+                return res.json();
+            })
+        );
+    }
+
+    Promise.all(fetchPromises)
+    .then(results => {
+        let rawElevations = [];
+        results.forEach(data => {
+            if (data.elevation) rawElevations = rawElevations.concat(data.elevation);
+        });
+
+        // 📊 LISSAGE ADAPTATIF (plus agressif pour les longs parcours)
+        let smoothedElevations = [];
+        const lissageWindow = distanceTotalKm > 30 ? 5 : 3; // Fenêtre élargie pour lisser les bruits
+
+        for (let i = 0; i < rawElevations.length; i++) {
+            let sum = 0;
+            let count = 0;
+            for (let j = Math.max(0, i - Math.floor(lissageWindow/2));
+                 j <= Math.min(rawElevations.length - 1, i + Math.floor(lissageWindow/2));
+                 j++) {
+                sum += rawElevations[j];
+                count++;
+            }
+            smoothedElevations.push(sum / count);
         }
+
+        // Construction des données pour le profil
+        let labelsDistance = ["0.00"];
+        let donneesAltitude = [smoothedElevations[0]];
+        let rawDistances = [0];
+        let distanceAccumulee = 0;
+        coordinateMappingIndices = [...indexOrigine];
+
+        for (let i = 1; i < smoothedElevations.length; i++) {
+            let ptA = coordinates3D[indexOrigine[i - 1]];
+            let ptB = coordinates3D[indexOrigine[i]];
+            distanceAccumulee += calculerDistanceEntreDeuxPoints(ptA.lat, ptA.lng, ptB.lat, ptB.lng);
+            labelsDistance.push(distanceAccumulee.toFixed(2));
+            rawDistances.push(distanceAccumulee * 1000);
+            donneesAltitude.push(smoothedElevations[i]);
+        }
+
+        // Calcul D+/D-
+        let dPlusCumule = 0;
+        let dMoinsCumule = 0;
+        datasetDPlusCumule = [0];
+        datasetDMoinsCumule = [0];
+        let derniereAltitudeValide = donneesAltitude[0];
+        const SEUIL_AUTONOME = 6.0;
+
+        for (let k = 1; k < donneesAltitude.length; k++) {
+            let delta = donneesAltitude[k] - derniereAltitudeValide;
+            if (delta >= SEUIL_AUTONOME) {
+                dPlusCumule += delta;
+                derniereAltitudeValide = donneesAltitude[k];
+            } else if (delta <= -SEUIL_AUTONOME) {
+                dMoinsCumule += Math.abs(delta);
+                derniereAltitudeValide = donneesAltitude[k];
+            }
+            datasetDPlusCumule.push(Math.round(dPlusCumule));
+            datasetDMoinsCumule.push(Math.round(dMoinsCumule));
+        }
+
+        totalCalculatedDPlus = Math.round(dPlusCumule);
+        totalCalculatedDMoins = Math.round(dMoinsCumule);
+
+        // Affichage final
+        afficherLigneSurCarte(coordinates3D, distanceTotalKm, totalCalculatedDPlus, totalCalculatedDMoins, indexOrigine, donneesAltitude, rawDistances);
+        dessinerProfilAltimetrique(labelsDistance, donneesAltitude, rawDistances);
+    })
+    .catch((error) => {
+        console.error("Erreur API Open-Meteo:", error);
+        // Fallback : on affiche le tracé avec des altitudes par défaut
+        const fallbackAltitudes = Array(indexOrigine.length).fill(280);
+        const fallbackRawDistances = Array.from({length: indexOrigine.length}, (_, i) =>
+            i * (distanceTotalKm * 1000 / (indexOrigine.length - 1 || 1))
+        );
+        afficherLigneSurCarte(coordinates3D, distanceTotalKm, 0, 0, indexOrigine, fallbackAltitudes, fallbackRawDistances);
+        dessinerProfilAltimetrique(
+            Array.from({length: indexOrigine.length}, (_, i) => (i * distanceTotalKm / (indexOrigine.length - 1 || 1)).toFixed(2)),
+            fallbackAltitudes,
+            fallbackRawDistances
+        );
+        document.getElementById('info').innerText = "⚠️ Altitudes non disponibles (API limitée). Profil affiché avec altitude par défaut.";
+    });
+}
 
         // --- AFFICHAGES GRAPHIQUES ---
         function dessinerProfilAltimetrique(labelsDistance, donneesAltitude, rawDistances) {
