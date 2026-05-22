@@ -84,6 +84,7 @@
             box-sizing: border-box;
         }
         #import-gpx-btn { background: #9b59b6; }
+        #visu3d-btn { background: #8e44ad; }
         
         .chart-wrapper { 
             height: 100%; 
@@ -182,6 +183,7 @@
                 <button id="route-btn" class="action-btn" disabled>Générer le tracé</button>
                 <button id="next-btn" class="action-btn" disabled>🔄 Varier le parcours auto</button>
                 <button id="gpx-btn" class="action-btn" disabled>💾 Exporter en fichier GPX</button>
+                <button id="visu3d-btn" class="action-btn" disabled>🌍 Voir en 3D</button>
                 <!-- Dans la div .btn-stack, après le bouton gpx-btn -->
 <button id="import-gpx-btn" class="action-btn">📂 Importer fichier GPX</button>
 <input type="file" id="gpx-file-input" accept=".gpx" style="display: none;">
@@ -774,6 +776,7 @@ function afficherLigneSurCarte(coordinates, distanceTotalKm, dPlus, dMoins, inde
     totalCalculatedDistance = distanceTotalKm;
     totalCalculatedDPlus = dPlus;
     totalCalculatedDMoins = dMoins;
+    visu3dBtn.disabled = false;  // Active le bouton 3D
 
     // Nettoyage des marqueurs spéciaux (départ/arrivée/sommets)
     specialMarkersGroup.clearLayers();
@@ -954,6 +957,7 @@ function afficherLigneSurCarte(coordinates, distanceTotalKm, dPlus, dMoins, inde
     if (elevationChart) { elevationChart.destroy(); elevationChart = null; }
     elevationOuter.style.display = "none";
     map.invalidateSize();
+    visu3dBtn.disabled = true;  // Désactive le bouton 3D
 }
 
         function calculEstimationDuree() {
@@ -1053,6 +1057,38 @@ gpxFileInput.addEventListener('change', (e) => {
     };
     reader.readAsText(file);
 });
+    // --- BOUTON VISUALISATION 3D (téléchargement + ouverture) ---
+const visu3dBtn = document.getElementById('visu3d-btn');
+
+function ouvrirDansVisuGPX() {
+    if (globalCoordinates.length === 0) return;
+
+    // 1. Générer le GPX
+    let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Éditeur Outdoor PRO" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk>\n    <name>Mon Tracé Outdoor</name>\n    <trkseg>\n`;
+    for (let i = 0; i < globalCoordinates.length; i++) {
+        gpxContent += `      <trkpt lat="${globalCoordinates[i].lat.toFixed(6)}" lon="${globalCoordinates[i].lng.toFixed(6)}"></trkpt>\n`;
+    }
+    gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
+
+    // 2. Télécharger automatiquement le fichier GPX
+    const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ma_trace_outdoor.gpx';  // Nom de fichier clair
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    // 3. Ouvrir VisuGPX après un délai (pour laisser le temps au téléchargement)
+    setTimeout(() => {
+        window.open('https://www.visugpx.com/editgpx/', '_blank');
+        document.getElementById('info').innerText = "✅ Fichier 'ma_trace_outdoor.gpx' téléchargé ! Sur VisuGPX : cliquez sur 'Ouvrir GPX' → Sélectionnez le fichier dans vos téléchargements.";
+    }, 800);  // Délai de 800ms pour le téléchargement
+}
+
+visu3dBtn.addEventListener('click', ouvrirDansVisuGPX);
     </script>
 </body>
 </html>
