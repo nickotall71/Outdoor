@@ -406,19 +406,25 @@
 
         // --- GESTION DES CLICS SUR LA CARTE ---
         map.on('click', (e) => {
-            const lat = e.latlng.lat; const lng = e.latlng.lng;
-            if (currentMode === 'auto') {
-                if (waypoints.length === 0) {
-                    waypoints.push({lat, lng, method: 'auto'});
-                    reconstruireMarqueurs(); routeBtn.disabled = false; nextBtn.disabled = false;
-                    document.getElementById('info').innerText = "Départ fixé. Cliquez sur 'Générer le tracé' !";
-                }
-            } else {
-                waypoints.push({lat, lng, method: waypoints.length === 0 ? 'auto' : drawingMethod});
-                reconstruireMarqueurs();
-                if (waypoints.length >= 1) { routeBtn.disabled = false; générerTracéMaitre(); }
-            }
-        });
+    const lat = e.latlng.lat; const lng = e.latlng.lng;
+    if (currentMode === 'auto') {
+        if (waypoints.length === 0) {
+            waypoints.push({lat, lng, method: 'auto'});
+            reconstruireMarqueurs();
+            routeBtn.disabled = false; nextBtn.disabled = false;
+            document.getElementById('info').innerText = "Départ fixé. Cliquez sur 'Générer le tracé' !";
+            map.flyTo([lat, lng], map.getZoom()); // 👈 Centrage fluide
+        }
+    } else {
+        waypoints.push({lat, lng, method: waypoints.length === 0 ? 'auto' : drawingMethod});
+        reconstruireMarqueurs();
+        if (waypoints.length >= 1) {
+            routeBtn.disabled = false;
+            générerTracéMaitre();
+            map.flyTo([lat, lng], map.getZoom()); // 👈 Centrage fluide
+        }
+    }
+});
 
         function reconstruireMarqueurs() {
             markersGroup.clearLayers();
@@ -439,11 +445,12 @@
                 marker.bindPopup(popupText);
 
                 marker.on('dragend', (event) => {
-                    const position = event.target.getLatLng();
-                    waypoints[index].lat = position.lat;
-                    waypoints[index].lng = position.lng;
-                    générerTracéMaitre();
-                });
+    const position = event.target.getLatLng();
+    waypoints[index].lat = position.lat;
+    waypoints[index].lng = position.lng;
+    générerTracéMaitre();
+    map.flyTo(position, map.getZoom()); // 👈 Centrage fluide après déplacement
+});
 
                 marker.on('contextmenu', () => {
                     if (waypoints.length <= 1) return;
@@ -913,8 +920,7 @@
                 }
             }
 
-            let bounds = routeLayer.getBounds();
-            map.fitBounds(bounds, { maxZoom: map.getZoom(), padding: [20, 20] });
+            
 
             gpxBtn.disabled = false;
             reverseBtn.disabled = false; // Active le bouton après affichage
