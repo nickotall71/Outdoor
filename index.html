@@ -118,6 +118,17 @@
         #route-btn { background: #3498db; }
         #next-btn { background: #e67e22; }
         #gpx-btn { background: #2ecc71; }
+
+        #search-input:focus { outline: none; border-color: #3498db; }
+#search-results div {
+    padding: 6px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #2c3e50;
+    border-radius: 3px;
+}
+#search-results div:hover { background: #f1f2f6; }
+#search-results div.selected { background: #e3f2fd; }
         
         .sub-btn-grid { display: flex; gap: 5px; }
         #undo-btn { background: #95a5a6; flex: 1; }
@@ -142,6 +153,16 @@
         <!-- SIDEBAR GAUCHE -->
         <div id="controls-sidebar">
             <h3>Éditeur Outdoor PRO</h3>
+            <div class="control-group" id="search-group">
+    <div class="group-label">
+        <span>🔍 Rechercher une commune :</span>
+    </div>
+    <div style="display: flex; gap: 6px;">
+        <input type="text" id="search-input" placeholder="Ex: Lyon, Grenoble..." style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+        <button id="search-btn" class="action-btn" style="padding: 8px 12px; font-size: 12px; background: #3498db;">Rechercher</button>
+    </div>
+    <div id="search-results" style="margin-top: 6px; max-height: 150px; overflow-y: auto; display: none; background: white; border: 1px solid #ddd; border-radius: 4px; padding: 4px;"></div>
+</div>
             
             <div class="mode-selector">
                 <button id="btn-mode-auto" class="mode-btn active">⚡ Auto (Curseurs)</button>
@@ -1089,6 +1110,62 @@ function ouvrirDansVisuGPX() {
 }
 
 visu3dBtn.addEventListener('click', ouvrirDansVisuGPX);
+
+// --- RECHERCHE DE COMMUNES ---
+const searchInput = document.getElementById('search-input');
+const searchBtn = document.getElementById('search-btn');
+const searchResults = document.getElementById('search-results');
+let searchTimeout;
+
+searchInput.addEventListener('input', () => {
+    if (searchInput.value.length < 2) {
+        searchResults.style.display = 'none';
+        return;
+    }
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(rechercherCommunes, 300);
+});
+
+searchBtn.addEventListener('click', rechercherCommunes);
+
+function rechercherCommunes() {
+    const query = searchInput.value.trim();
+    if (query.length < 2) return;
+
+    // 👇 API Adresse (officielle, CORS activé)
+    const apiUrl = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&type=municipality&autocomplete=1&limit=5`;
+
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            if (!data.features || data.features.length === 0) {
+                searchResults.innerHTML = '<div style="color: #e74c3c; padding: 6px;">Aucun résultat trouvé</div>';
+                searchResults.style.display = 'block';
+                return;
+            }
+            searchResults.innerHTML = '';
+            data.features.forEach(feature => {
+                const commune = feature.properties.label;
+                const [lon, lat] = feature.geometry.coordinates;
+                const div = document.createElement('div');
+                div.textContent = commune;
+                div.dataset.lat = lat;
+                div.dataset.lon = lon;
+                div.addEventListener('click', () => {
+                    map.setView([lat, lon], 14);
+                    searchResults.style.display = 'none';
+                    searchInput.value = commune;
+                });
+                searchResults.appendChild(div);
+            });
+            searchResults.style.display = 'block';
+        })
+        .catch(error => {
+            searchResults.innerHTML = '<div style="color: #e74c3c; padding: 6px;">Erreur de connexion</div>';
+            searchResults.style.display = 'block';
+            console.error("Erreur API Adresse:", error);
+        });
+}
     </script>
 </body>
 </html>
