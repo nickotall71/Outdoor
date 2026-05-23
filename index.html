@@ -4,36 +4,36 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Éditeur Outdoor PRO - Tracé Securisé</title>
-    
+
     <!-- Leaflet (Cartographie) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
+
     <!-- Chart.js (Profil Altimétrique) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
+
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; font-family: Arial, sans-serif; background: #f5f6fa; overflow: hidden; }
         #main-container { display: flex; height: 100vh; width: 100vw; }
-        
+
         #controls-sidebar {
-            width: 340px; min-width: 340px; background: white; padding: 20px; 
-            box-shadow: 2px 0 15px rgba(0,0,0,0.1); z-index: 1000; 
+            width: 340px; min-width: 340px; background: white; padding: 20px;
+            box-shadow: 2px 0 15px rgba(0,0,0,0.1); z-index: 1000;
             box-sizing: border-box; display: flex; flex-direction: column; gap: 12px;
             overflow-y: auto; height: 100%;
         }
-        
+
         #map-container { flex: 1; display: flex; flex-direction: column; height: 100%; position: relative; min-width: 0; }
         #map { flex: 1; width: 100%; }
-        
+
         /* STRUCTURE DU PROFIL ALTIMETRIQUE */
         #elevation-outer {
-            height: 260px; 
-            background: white; 
-            border-top: 2px solid #ddd; 
-            display: none; 
+            height: 260px;
+            background: white;
+            border-top: 2px solid #ddd;
+            display: none;
             flex-direction: column;
             z-index: 1000;
-            width: 100%; 
+            width: 100%;
             max-width: 100%;
         }
 
@@ -44,10 +44,10 @@
             padding: 8px 15px;
             background: #f8f9fa;
             border-bottom: 1px solid #eee;
-            width: 100%; 
+            width: 100%;
             box-sizing: border-box;
         }
-        
+
         #elevation-title {
             font-size: 13px;
             font-weight: bold;
@@ -74,37 +74,37 @@
         }
         #view-toggle-btn:hover { background: #2c3e50; }
 
-        #elevation-container { 
+        #elevation-container {
             flex: 1;
             width: 100%;
             max-width: 100%;
-            overflow-x: auto; 
+            overflow-x: auto;
             overflow-y: hidden;
             padding: 15px 10px 10px 10px;
             box-sizing: border-box;
         }
         #import-gpx-btn { background: #9b59b6; }
         #visu3d-btn { background: #8e44ad; }
-        
-        .chart-wrapper { 
-            height: 100%; 
-            position: relative; 
+
+        .chart-wrapper {
+            height: 100%;
+            position: relative;
         }
 
         h3 { margin: 0; font-size: 16px; color: #2c3e50; text-align: center; border-bottom: 2px solid #eee; padding-bottom: 8px; }
-        
+
         .mode-selector { display: flex; gap: 4px; background: #f1f2f6; padding: 4px; border-radius: 6px; }
         .mode-btn { flex: 1; background: transparent; color: #7f8c8d; padding: 8px; font-size: 11px; border-radius: 4px; border: none; cursor: pointer; font-weight: bold; transition: all 0.2s; }
         .mode-btn.active { background: #2c3e50; color: white; }
-        
+
         .control-group { margin-bottom: 2px; }
         .group-label { display: flex; justify-content: space-between; font-size: 13px; font-weight: bold; color: #555; margin-bottom: 4px; }
-        
+
         input[type=range] { width: 100%; height: 6px; background: #ddd; border-radius: 3px; outline: none; cursor: pointer; }
-        
+
         .radio-group { display: flex; justify-content: space-around; background: #f1f2f6; padding: 8px; border-radius: 5px; }
         .radio-group label { font-size: 12px; font-weight: bold; color: #2c3e50; cursor: pointer; display: flex; align-items: center; gap: 4px; }
-        
+
         #sub-drawing-mode { display: none; background: #fff3cd; border: 1px solid #ffeeba; padding: 6px; border-radius: 5px; flex-direction: column; gap: 4px; }
         .sub-mode-title { font-size: 11px; font-weight: bold; color: #856404; margin-bottom: 2px; text-align: center;}
         .drawing-type-selector { display: flex; gap: 4px; }
@@ -114,26 +114,27 @@
         .btn-stack { display: flex; flex-direction: column; gap: 6px; margin-top: 5px; }
         button.action-btn { color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; font-size: 13px; transition: opacity 0.2s; }
         button:disabled { background: #bdc3c7 !important; cursor: not-allowed; opacity: 0.6; }
-        
+
         #route-btn { background: #3498db; }
         #next-btn { background: #e67e22; }
         #gpx-btn { background: #2ecc71; }
+        #reverse-btn { background: #9b59b6; } /* Bouton Inverser */
 
         #search-input:focus { outline: none; border-color: #3498db; }
-#search-results div {
-    padding: 6px 8px;
-    cursor: pointer;
-    font-size: 12px;
-    color: #2c3e50;
-    border-radius: 3px;
-}
-#search-results div:hover { background: #f1f2f6; }
-#search-results div.selected { background: #e3f2fd; }
-        
+        #search-results div {
+            padding: 6px 8px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #2c3e50;
+            border-radius: 3px;
+        }
+        #search-results div:hover { background: #f1f2f6; }
+        #search-results div.selected { background: #e3f2fd; }
+
         .sub-btn-grid { display: flex; gap: 5px; }
         #undo-btn { background: #95a5a6; flex: 1; }
         #reset-btn { background: #e74c3c; flex: 1; }
-        
+
         .grise { opacity: 0.35; pointer-events: none; }
         #info { margin-top: auto; font-size: 12px; color: #2c3e50; text-align: center; font-weight: bold; border-top: 1px solid #eee; padding-top: 10px; line-height: 1.5; }
 
@@ -149,21 +150,21 @@
 <body>
 
     <div id="main-container">
-        
+
         <!-- SIDEBAR GAUCHE -->
         <div id="controls-sidebar">
             <h3>Éditeur Outdoor PRO</h3>
             <div class="control-group" id="search-group">
-    <div class="group-label">
-        <span>🔍 Rechercher une commune :</span>
-    </div>
-    <div style="display: flex; gap: 6px;">
-        <input type="text" id="search-input" placeholder="Ex: Lyon, Grenoble..." style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
-        <button id="search-btn" class="action-btn" style="padding: 8px 12px; font-size: 12px; background: #3498db;">Rechercher</button>
-    </div>
-    <div id="search-results" style="margin-top: 6px; max-height: 150px; overflow-y: auto; display: none; background: white; border: 1px solid #ddd; border-radius: 4px; padding: 4px;"></div>
-</div>
-            
+                <div class="group-label">
+                    <span>🔍 Rechercher une commune :</span>
+                </div>
+                <div style="display: flex; gap: 6px;">
+                    <input type="text" id="search-input" placeholder="Ex: Lyon, Grenoble..." style="flex: 1; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px;">
+                    <button id="search-btn" class="action-btn" style="padding: 8px 12px; font-size: 12px; background: #3498db;">Rechercher</button>
+                </div>
+                <div id="search-results" style="margin-top: 6px; max-height: 150px; overflow-y: auto; display: none; background: white; border: 1px solid #ddd; border-radius: 4px; padding: 4px;"></div>
+            </div>
+
             <div class="mode-selector">
                 <button id="btn-mode-auto" class="mode-btn active">⚡ Auto (Curseurs)</button>
                 <button id="btn-mode-manual" class="mode-btn">✏️ Dessin (Points)</button>
@@ -176,12 +177,12 @@
                     <button id="draw-manual-btn" class="draw-btn">✏️ Manuel (Droit)</button>
                 </div>
             </div>
-            
+
             <div class="radio-group">
                 <label><input type="radio" name="format" value="boucle" checked> 🔄 Boucle</label>
                 <label><input type="radio" name="format" value="aller-retour"> ↕️ Aller-Retour</label>
             </div>
-            
+
             <div class="control-group" style="background: #f8f9fa; padding: 8px; border-radius: 5px; border: 1px solid #eee;">
                 <div class="group-label">
                     <span>⏱️ Allure cible :</span>
@@ -189,7 +190,7 @@
                 </div>
                 <input type="range" id="allure-slider" min="3" max="15" value="6" step="0.25">
             </div>
-            
+
             <div id="sliders-zone">
                 <div class="control-group">
                     <div class="group-label">
@@ -199,28 +200,28 @@
                     <input type="range" id="distance-slider" min="2" max="50" value="8" step="1">
                 </div>
             </div>
-            
+
             <div class="btn-stack">
                 <button id="route-btn" class="action-btn" disabled>Générer le tracé</button>
                 <button id="next-btn" class="action-btn" disabled>🔄 Varier le parcours auto</button>
+                <button id="reverse-btn" class="action-btn" disabled>🔀 Inverser le sens</button> <!-- NOUVEAU BOUTON -->
                 <button id="gpx-btn" class="action-btn" disabled>💾 Exporter en fichier GPX</button>
                 <button id="visu3d-btn" class="action-btn" disabled>🌍 Voir en 3D</button>
-                <!-- Dans la div .btn-stack, après le bouton gpx-btn -->
-<button id="import-gpx-btn" class="action-btn">📂 Importer fichier GPX</button>
-<input type="file" id="gpx-file-input" accept=".gpx" style="display: none;">
+                <button id="import-gpx-btn" class="action-btn">📂 Importer fichier GPX</button>
+                <input type="file" id="gpx-file-input" accept=".gpx" style="display: none;">
                 <div class="sub-btn-grid">
                     <button id="undo-btn" class="action-btn">↩️ Annuler</button>
                     <button id="reset-btn" class="action-btn">❌ Reset</button>
                 </div>
             </div>
-            
+
             <div id="info">📍 Cliquez sur la carte pour poser votre point de départ.</div>
         </div>
-        
+
         <!-- BLOC CARTE ET PROFIL (DROITE) -->
         <div id="map-container">
             <div id="map"></div>
-            
+
             <div id="elevation-outer">
                 <div id="elevation-header">
                     <div id="elevation-title">
@@ -241,11 +242,10 @@
                 </div>
             </div>
         </div>
-
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
+
     <script>
         // --- FONCTIONS UTILITAIRES ---
         function calculerDistanceEntreDeuxPoints(lat1, lon1, lat2, lon2) {
@@ -260,10 +260,10 @@
         }
 
         function getCouleurPente(pentePourcentage) {
-            if (pentePourcentage < 5) return '#2ecc71'; 
-            if (pentePourcentage < 10) return '#f39c12'; 
-            if (pentePourcentage < 15) return '#e74c3c'; 
-            return '#111111'; 
+            if (pentePourcentage < 5) return '#2ecc71';
+            if (pentePourcentage < 10) return '#f39c12';
+            if (pentePourcentage < 15) return '#e74c3c';
+            return '#111111';
         }
 
         // --- INITIALISATION CARTE ---
@@ -275,7 +275,7 @@
 
         const map = L.map('map', { center: [46.4632, 4.6582], zoom: 13, layers: [openTopo] });
 
-        const fondsDeCarte = { 
+        const fondsDeCarte = {
             "⛰️ OpenTopoMap": openTopo,
             "🇫🇷 IGN Plan": ignPlan,
             "🇫🇷 IGN Satellite": ignSatellite,
@@ -286,45 +286,45 @@
 
         // --- VARIABLES GLOBALES ---
         let currentMode = 'auto';
-        let drawingMethod = 'auto'; 
-        let waypoints = []; 
+        let drawingMethod = 'auto';
+        let waypoints = [];
         let markersGroup = L.layerGroup().addTo(map);
-        // Layer group dédié aux marqueurs spéciaux (départ/arrivée/sommets)
-let specialMarkersGroup = L.layerGroup().addTo(map);
+        let specialMarkersGroup = L.layerGroup().addTo(map);
 
-// --- ICÔNES PERSONNALISÉES ---
-const startIcon = L.divIcon({
-    className: 'custom-marker',
-    html: `<div style="background: #2ecc71; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 0 12px rgba(0,0,0,0.6); font-size: 14px;">D</div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14]
-});
+        // --- ICÔNES PERSONNALISÉES ---
+        const startIcon = L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="background: #2ecc71; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 0 12px rgba(0,0,0,0.6); font-size: 14px;">D</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+        });
 
-const endIcon = L.divIcon({
-    className: 'custom-marker',
-    html: `<div style="background: #e74c3c; width: 28px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 0 12px rgba(0,0,0,0.6); font-size: 14px; transform: rotate(45deg);"><span style="transform: rotate(-45deg); display: inline-block;">🏁</span></div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14]
-});
+        const endIcon = L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="background: #e74c3c; width: 28px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 0 12px rgba(0,0,0,0.6); font-size: 14px; transform: rotate(45deg);"><span style="transform: rotate(-45deg); display: inline-block;">🏁</span></div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+        });
 
-const summitIcon = L.divIcon({
-    className: 'custom-marker',
-    html: `<div style="background: #f39c12; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 0 12px rgba(0,0,0,0.6); font-size: 14px;">⛰️</div>`,
-    iconSize: [28, 28],
-    iconAnchor: [14, 14]
-});
-        let routeLayer = null; 
-        let hoverMarker = null; 
-        let currentAngleOffset = 0; 
-        let globalCoordinates = []; 
-        let coordinateMappingIndices = []; 
-        
+        const summitIcon = L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="background: #f39c12; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; border: 3px solid white; box-shadow: 0 0 12px rgba(0,0,0,0.6); font-size: 14px;">⛰️</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+        });
+
+        let routeLayer = null;
+        let hoverMarker = null;
+        let currentAngleOffset = 0;
+        let globalCoordinates = [];
+        let coordinateMappingIndices = [];
+
         let totalCalculatedDistance = 0;
         let totalCalculatedDPlus = 0;
         let totalCalculatedDMoins = 0;
-        
-        let elevationChart = null; 
-        let isFitView = false; 
+
+        let elevationChart = null;
+        let isFitView = false;
 
         let lastLabels = [];
         let lastAltitudes = [];
@@ -357,6 +357,7 @@ const summitIcon = L.divIcon({
         const nextBtn = document.getElementById('next-btn');
         const routeBtn = document.getElementById('route-btn');
         const gpxBtn = document.getElementById('gpx-btn');
+        const reverseBtn = document.getElementById('reverse-btn'); // NOUVEAU
         const subDrawingModeContainer = document.getElementById('sub-drawing-mode');
         const elevationOuter = document.getElementById('elevation-outer');
         const viewToggleBtn = document.getElementById('view-toggle-btn');
@@ -391,7 +392,7 @@ const summitIcon = L.divIcon({
 
         const allureSlider = document.getElementById('allure-slider');
         const allureVal = document.getElementById('allure-val');
-        
+
         function formatAllure(valeurDecimale) {
             let minutes = Math.floor(valeurDecimale); let secondes = Math.round((valeurDecimale - minutes) * 60);
             if(secondes === 60) { minutes++; secondes = 0; }
@@ -421,22 +422,61 @@ const summitIcon = L.divIcon({
 
         function reconstruireMarqueurs() {
             markersGroup.clearLayers();
+            specialMarkersGroup.clearLayers();
             waypoints.forEach((wp, index) => {
                 const isStart = index === 0;
-                const marker = L.marker([wp.lat, wp.lng], { icon: isStart ? new L.Icon.Default() : orangeIcon, draggable: true }).addTo(markersGroup);
-                marker.bindPopup(isStart ? "<b>Départ (Glissable)</b>" : `<b>Étape ${index} (${wp.method})</b>`);
-                
+                const isEnd = index === waypoints.length - 1;
+                const icon = isStart ? startIcon : (isEnd ? endIcon : orangeIcon);
+                const marker = L.marker([wp.lat, wp.lng], {
+                    icon: icon,
+                    draggable: true,
+                    zIndexOffset: 1000
+                }).addTo(markersGroup);
+
+                let popupText = isStart ? "<b>📍 Départ (Glissable)</b>" :
+                               isEnd ? "<b>🏁 Arrivée (Glissable)</b>" :
+                               `<b>Étape ${index} (${wp.method})</b>`;
+                marker.bindPopup(popupText);
+
                 marker.on('dragend', (event) => {
                     const position = event.target.getLatLng();
-                    waypoints[index].lat = position.lat; waypoints[index].lng = position.lng;
+                    waypoints[index].lat = position.lat;
+                    waypoints[index].lng = position.lng;
                     générerTracéMaitre();
                 });
-                
+
                 marker.on('contextmenu', () => {
-                    waypoints.splice(index, 1); reconstruireMarqueurs();
-                    if(waypoints.length > 0) générerTracéMaitre(); else document.getElementById('reset-btn').click();
+                    if (waypoints.length <= 1) return;
+                    waypoints.splice(index, 1);
+                    reconstruireMarqueurs();
+                    if (waypoints.length > 0) générerTracéMaitre();
+                    else document.getElementById('reset-btn').click();
                 });
             });
+
+            if (globalCoordinates.length > 0) {
+                afficherLigneSurCarte(globalCoordinates, totalCalculatedDistance, totalCalculatedDPlus, totalCalculatedDMoins);
+            }
+        }
+
+        // --- NOUVELLE FONCTION : INVERSER LE SENS DU PARCOURS ---
+        function inverserSensParcours() {
+            if (waypoints.length < 2) return;
+
+            const formatChoisi = document.querySelector('input[name="format"]:checked').value;
+            if (formatChoisi === "boucle") {
+                // Pour une boucle : on inverse tous les waypoints SAUF le premier (départ)
+                const depart = waypoints[0];
+                const autresPoints = waypoints.slice(1).reverse();
+                waypoints = [depart, ...autresPoints];
+            } else {
+                // Pour un aller-retour : on inverse simplement tout
+                waypoints.reverse();
+            }
+
+            reconstruireMarqueurs();
+            générerTracéMaitre();
+            document.getElementById('info').innerText = "🔀 Sens du parcours inversé !";
         }
 
         document.getElementById('undo-btn').addEventListener('click', () => {
@@ -448,13 +488,14 @@ const summitIcon = L.divIcon({
 
         routeBtn.addEventListener('click', () => { currentAngleOffset = 0; générerTracéMaitre(); });
         nextBtn.addEventListener('click', () => { currentAngleOffset += 0.8; générerTracéMaitre(); });
+        reverseBtn.addEventListener('click', inverserSensParcours); // NOUVEAU
 
         // --- CALCULS DU PARCOURS ---
         function générerTracéMaitre() { générerParcoursHybride(1.0); }
 
         async function générerParcoursHybride(facteurEchelle, iteration = 0) {
             if (waypoints.length === 0) return;
-            
+
             const distanceChoisie = parseFloat(distanceSlider.value);
             const formatChoisi = document.querySelector('input[name="format"]:checked').value;
             let segmentsAVisiter = [];
@@ -468,21 +509,20 @@ const summitIcon = L.divIcon({
                     const cap = (distanceChoisie / 2) * 0.0065 * 0.72 * facteurEchelle;
                     segmentsAVisiter.push({ lat: start.lat + cap * Math.cos(currentAngleOffset), lng: start.lng + cap * Math.sin(currentAngleOffset), method: 'auto' });
                 } else {
-                    const rayon = (distanceChoisie / (2 * Math.PI)) * 0.008 * facteurEchelle; // Circonférence = distanceChoisie
-            const nbPoints = 6; // 6 points pour une forme hexagonale naturelle
+                    const rayon = (distanceChoisie / (2 * Math.PI)) * 0.008 * facteurEchelle;
+                    const nbPoints = 6;
 
-            for (let i = 1; i <= nbPoints; i++) {
-                const angle = currentAngleOffset + (2 * Math.PI * i / nbPoints);
-                segmentsAVisiter.push({
-                    lat: start.lat + rayon * Math.cos(angle),
-                    lng: start.lng + rayon * Math.sin(angle),
-                    method: 'auto'
-                });
+                    for (let i = 1; i <= nbPoints; i++) {
+                        const angle = currentAngleOffset + (2 * Math.PI * i / nbPoints);
+                        segmentsAVisiter.push({
+                            lat: start.lat + rayon * Math.cos(angle),
+                            lng: start.lng + rayon * Math.sin(angle),
+                            method: 'auto'
+                        });
+                    }
+                    segmentsAVisiter.push({lat: start.lat, lng: start.lng, method: 'auto'});
+                }
             }
-            // Retour au départ pour fermer la boucle
-            segmentsAVisiter.push({lat: start.lat, lng: start.lng, method: 'auto'});
-        }
-    }
             document.getElementById('info').innerText = "Calcul du tracé...";
             let fullCoordinates = [];
             let distanceTotaleCumulee = 0;
@@ -492,9 +532,8 @@ const summitIcon = L.divIcon({
                 let ptPrecedent = segmentsAVisiter[i - 1]; let ptActuel = segmentsAVisiter[i];
 
                 if (ptActuel.method === 'manual') {
-                    // Interpolation des points manuels (1 tous les 30m)
                     let distSegment = calculerDistanceEntreDeuxPoints(ptPrecedent.lat, ptPrecedent.lng, ptActuel.lat, ptActuel.lng);
-                    let nbEtapes = Math.max(1, Math.floor((distSegment * 1000) / 30)); 
+                    let nbEtapes = Math.max(1, Math.floor((distSegment * 1000) / 30));
                     for(let etp = 1; etp <= nbEtapes; etp++) {
                         let fraction = etp / nbEtapes;
                         let latInterp = ptPrecedent.lat + (ptActuel.lat - ptPrecedent.lat) * fraction;
@@ -534,169 +573,158 @@ const summitIcon = L.divIcon({
             }
         }
 
-        // 🚀 GESTION AVANCEE DU RELIEF (OPTIMISÉ POUR LES LONGS PARCOURS)
-// 🚀 GESTION AVANCEE DU RELIEF (OPTIMISÉ POUR LES LONGS PARCOURS)
-function traiterReliefDepuisTracé(coordinates3D, distanceTotalKm) {
-    if (coordinates3D.length === 0) return;
-    document.getElementById('info').innerText = "Analyse altimétrique en cours...";
+        // --- GESTION AVANCÉE DU RELIEF ---
+        function traiterReliefDepuisTracé(coordinates3D, distanceTotalKm) {
+            if (coordinates3D.length === 0) return;
+            document.getElementById('info').innerText = "Analyse altimétrique en cours...";
 
-    const maxPointsAPI = 80; // Limite Open-Meteo
-    let lats = [];
-    let lngs = [];
-    let indexOrigine = [];
+            const maxPointsAPI = 80;
+            let lats = [];
+            let lngs = [];
+            let indexOrigine = [];
 
-    // 📏 ÉCHANTILLONNAGE ADAPTATIF (en km)
-    // Plus le parcours est long, plus on espace les points pour l'API
-    let samplingDistanceKm;
-    if (distanceTotalKm < 10) samplingDistanceKm = 0.03;   // 30m  (précision max)
-    else if (distanceTotalKm < 25) samplingDistanceKm = 0.05; // 50m
-    else if (distanceTotalKm < 50) samplingDistanceKm = 0.10; // 100m
-    else samplingDistanceKm = 0.20;                         // 200m (pour 50km+)
+            let samplingDistanceKm;
+            if (distanceTotalKm < 10) samplingDistanceKm = 0.03;
+            else if (distanceTotalKm < 25) samplingDistanceKm = 0.05;
+            else if (distanceTotalKm < 50) samplingDistanceKm = 0.10;
+            else samplingDistanceKm = 0.20;
 
-    // Échantillonnage intelligent (garantit au moins 1 point tous les 200m pour le profil)
-    let lastPt = coordinates3D[0];
-    indexOrigine.push(0);
-    lats.push(lastPt.lat.toFixed(5));
-    lngs.push(lastPt.lng.toFixed(5));
-
-    for (let i = 1; i < coordinates3D.length; i++) {
-        let d = calculerDistanceEntreDeuxPoints(
-            lastPt.lat, lastPt.lng,
-            coordinates3D[i].lat, coordinates3D[i].lng
-        );
-        // On force un point tous les 200m MAX pour garder un profil lisible
-        if (d >= samplingDistanceKm || i === coordinates3D.length - 1) {
-            lastPt = coordinates3D[i];
-            indexOrigine.push(i);
+            let lastPt = coordinates3D[0];
+            indexOrigine.push(0);
             lats.push(lastPt.lat.toFixed(5));
             lngs.push(lastPt.lng.toFixed(5));
-        }
-    }
 
-    // ⏳ CHUNKING + DÉLAI ENTRE REQUÊTES (évite la saturation API)
-    let fetchPromises = [];
-    for (let i = 0; i < lats.length; i += maxPointsAPI) {
-        // Délai progressif : 100ms par lot (évite les erreurs 429)
-        const delayMs = Math.floor(i / maxPointsAPI) * 100;
-
-        fetchPromises.push(
-            new Promise(resolve => setTimeout(resolve, delayMs))
-            .then(() => {
-                let chunkLats = lats.slice(i, i + maxPointsAPI).join(',');
-                let chunkLngs = lngs.slice(i, i + maxPointsAPI).join(',');
-                let urlElevation = `https://api.open-meteo.com/v1/elevation?latitude=${chunkLats}&longitude=${chunkLngs}`;
-                return fetch(urlElevation);
-            })
-            .then(res => {
-                if (!res.ok) throw new Error(`API Error: ${res.status}`);
-                return res.json();
-            })
-        );
-    }
-
-    Promise.all(fetchPromises)
-    .then(results => {
-        let rawElevations = [];
-        results.forEach(data => {
-            if (data.elevation) rawElevations = rawElevations.concat(data.elevation);
-        });
-
-        // 📊 LISSAGE ADAPTATIF (plus agressif pour les longs parcours)
-        let smoothedElevations = [];
-        const lissageWindow = distanceTotalKm > 30 ? 5 : 3; // Fenêtre élargie pour lisser les bruits
-
-        for (let i = 0; i < rawElevations.length; i++) {
-            let sum = 0;
-            let count = 0;
-            for (let j = Math.max(0, i - Math.floor(lissageWindow/2));
-                 j <= Math.min(rawElevations.length - 1, i + Math.floor(lissageWindow/2));
-                 j++) {
-                sum += rawElevations[j];
-                count++;
+            for (let i = 1; i < coordinates3D.length; i++) {
+                let d = calculerDistanceEntreDeuxPoints(
+                    lastPt.lat, lastPt.lng,
+                    coordinates3D[i].lat, coordinates3D[i].lng
+                );
+                if (d >= samplingDistanceKm || i === coordinates3D.length - 1) {
+                    lastPt = coordinates3D[i];
+                    indexOrigine.push(i);
+                    lats.push(lastPt.lat.toFixed(5));
+                    lngs.push(lastPt.lng.toFixed(5));
+                }
             }
-            smoothedElevations.push(sum / count);
-        }
 
-        // Construction des données pour le profil
-        let labelsDistance = ["0.00"];
-        let donneesAltitude = [smoothedElevations[0]];
-        let rawDistances = [0];
-        let distanceAccumulee = 0;
-        coordinateMappingIndices = [...indexOrigine];
-
-        for (let i = 1; i < smoothedElevations.length; i++) {
-            let ptA = coordinates3D[indexOrigine[i - 1]];
-            let ptB = coordinates3D[indexOrigine[i]];
-            distanceAccumulee += calculerDistanceEntreDeuxPoints(ptA.lat, ptA.lng, ptB.lat, ptB.lng);
-            labelsDistance.push(distanceAccumulee.toFixed(2));
-            rawDistances.push(distanceAccumulee * 1000);
-            donneesAltitude.push(smoothedElevations[i]);
-        }
-
-        // Calcul D+/D-
-        let dPlusCumule = 0;
-        let dMoinsCumule = 0;
-        datasetDPlusCumule = [0];
-        datasetDMoinsCumule = [0];
-        let derniereAltitudeValide = donneesAltitude[0];
-        const SEUIL_AUTONOME = 6.0;
-
-        for (let k = 1; k < donneesAltitude.length; k++) {
-            let delta = donneesAltitude[k] - derniereAltitudeValide;
-            if (delta >= SEUIL_AUTONOME) {
-                dPlusCumule += delta;
-                derniereAltitudeValide = donneesAltitude[k];
-            } else if (delta <= -SEUIL_AUTONOME) {
-                dMoinsCumule += Math.abs(delta);
-                derniereAltitudeValide = donneesAltitude[k];
+            let fetchPromises = [];
+            for (let i = 0; i < lats.length; i += maxPointsAPI) {
+                const delayMs = Math.floor(i / maxPointsAPI) * 100;
+                fetchPromises.push(
+                    new Promise(resolve => setTimeout(resolve, delayMs))
+                    .then(() => {
+                        let chunkLats = lats.slice(i, i + maxPointsAPI).join(',');
+                        let chunkLngs = lngs.slice(i, i + maxPointsAPI).join(',');
+                        let urlElevation = `https://api.open-meteo.com/v1/elevation?latitude=${chunkLats}&longitude=${chunkLngs}`;
+                        return fetch(urlElevation);
+                    })
+                    .then(res => {
+                        if (!res.ok) throw new Error(`API Error: ${res.status}`);
+                        return res.json();
+                    })
+                );
             }
-            datasetDPlusCumule.push(Math.round(dPlusCumule));
-            datasetDMoinsCumule.push(Math.round(dMoinsCumule));
+
+            Promise.all(fetchPromises)
+            .then(results => {
+                let rawElevations = [];
+                results.forEach(data => {
+                    if (data.elevation) rawElevations = rawElevations.concat(data.elevation);
+                });
+
+                let smoothedElevations = [];
+                const lissageWindow = distanceTotalKm > 30 ? 5 : 3;
+
+                for (let i = 0; i < rawElevations.length; i++) {
+                    let sum = 0;
+                    let count = 0;
+                    for (let j = Math.max(0, i - Math.floor(lissageWindow/2));
+                         j <= Math.min(rawElevations.length - 1, i + Math.floor(lissageWindow/2));
+                         j++) {
+                        sum += rawElevations[j];
+                        count++;
+                    }
+                    smoothedElevations.push(sum / count);
+                }
+
+                let labelsDistance = ["0.00"];
+                let donneesAltitude = [smoothedElevations[0]];
+                let rawDistances = [0];
+                let distanceAccumulee = 0;
+                coordinateMappingIndices = [...indexOrigine];
+
+                for (let i = 1; i < smoothedElevations.length; i++) {
+                    let ptA = coordinates3D[indexOrigine[i - 1]];
+                    let ptB = coordinates3D[indexOrigine[i]];
+                    distanceAccumulee += calculerDistanceEntreDeuxPoints(ptA.lat, ptA.lng, ptB.lat, ptB.lng);
+                    labelsDistance.push(distanceAccumulee.toFixed(2));
+                    rawDistances.push(distanceAccumulee * 1000);
+                    donneesAltitude.push(smoothedElevations[i]);
+                }
+
+                let dPlusCumule = 0;
+                let dMoinsCumule = 0;
+                datasetDPlusCumule = [0];
+                datasetDMoinsCumule = [0];
+                let derniereAltitudeValide = donneesAltitude[0];
+                const SEUIL_AUTONOME = 6.0;
+
+                for (let k = 1; k < donneesAltitude.length; k++) {
+                    let delta = donneesAltitude[k] - derniereAltitudeValide;
+                    if (delta >= SEUIL_AUTONOME) {
+                        dPlusCumule += delta;
+                        derniereAltitudeValide = donneesAltitude[k];
+                    } else if (delta <= -SEUIL_AUTONOME) {
+                        dMoinsCumule += Math.abs(delta);
+                        derniereAltitudeValide = donneesAltitude[k];
+                    }
+                    datasetDPlusCumule.push(Math.round(dPlusCumule));
+                    datasetDMoinsCumule.push(Math.round(dMoinsCumule));
+                }
+
+                totalCalculatedDPlus = Math.round(dPlusCumule);
+                totalCalculatedDMoins = Math.round(dMoinsCumule);
+
+                afficherLigneSurCarte(coordinates3D, distanceTotalKm, totalCalculatedDPlus, totalCalculatedDMoins, indexOrigine, donneesAltitude, rawDistances);
+                dessinerProfilAltimetrique(labelsDistance, donneesAltitude, rawDistances);
+                reverseBtn.disabled = false; // Active le bouton après génération
+            })
+            .catch((error) => {
+                console.error("Erreur API Open-Meteo:", error);
+                const fallbackAltitudes = Array(indexOrigine.length).fill(280);
+                const fallbackRawDistances = Array.from({length: indexOrigine.length}, (_, i) =>
+                    i * (distanceTotalKm * 1000 / (indexOrigine.length - 1 || 1))
+                );
+                afficherLigneSurCarte(coordinates3D, distanceTotalKm, 0, 0, indexOrigine, fallbackAltitudes, fallbackRawDistances);
+                dessinerProfilAltimetrique(
+                    Array.from({length: indexOrigine.length}, (_, i) => (i * distanceTotalKm / (indexOrigine.length - 1 || 1)).toFixed(2)),
+                    fallbackAltitudes,
+                    fallbackRawDistances
+                );
+                document.getElementById('info').innerText = "⚠️ Altitudes non disponibles (API limitée). Profil affiché avec altitude par défaut.";
+                reverseBtn.disabled = false; // Active quand même le bouton
+            });
         }
-
-        totalCalculatedDPlus = Math.round(dPlusCumule);
-        totalCalculatedDMoins = Math.round(dMoinsCumule);
-
-        // Affichage final
-        afficherLigneSurCarte(coordinates3D, distanceTotalKm, totalCalculatedDPlus, totalCalculatedDMoins, indexOrigine, donneesAltitude, rawDistances);
-        dessinerProfilAltimetrique(labelsDistance, donneesAltitude, rawDistances);
-    })
-    .catch((error) => {
-        console.error("Erreur API Open-Meteo:", error);
-        // Fallback : on affiche le tracé avec des altitudes par défaut
-        const fallbackAltitudes = Array(indexOrigine.length).fill(280);
-        const fallbackRawDistances = Array.from({length: indexOrigine.length}, (_, i) =>
-            i * (distanceTotalKm * 1000 / (indexOrigine.length - 1 || 1))
-        );
-        afficherLigneSurCarte(coordinates3D, distanceTotalKm, 0, 0, indexOrigine, fallbackAltitudes, fallbackRawDistances);
-        dessinerProfilAltimetrique(
-            Array.from({length: indexOrigine.length}, (_, i) => (i * distanceTotalKm / (indexOrigine.length - 1 || 1)).toFixed(2)),
-            fallbackAltitudes,
-            fallbackRawDistances
-        );
-        document.getElementById('info').innerText = "⚠️ Altitudes non disponibles (API limitée). Profil affiché avec altitude par défaut.";
-    });
-}
 
         // --- AFFICHAGES GRAPHIQUES ---
         function dessinerProfilAltimetrique(labelsDistance, donneesAltitude, rawDistances) {
-            elevationOuter.style.display = "flex"; 
-            map.invalidateSize(); 
+            elevationOuter.style.display = "flex";
+            map.invalidateSize();
 
             lastLabels = labelsDistance; lastAltitudes = donneesAltitude; lastRawDistances = rawDistances;
             if (elevationChart) { elevationChart.destroy(); }
 
             let distanceTotale = parseFloat(labelsDistance[labelsDistance.length - 1]);
             let conteneurLargeur = document.getElementById('elevation-outer').clientWidth;
-            if (conteneurLargeur === 0) conteneurLargeur = window.innerWidth - 340; 
-            
+            if (conteneurLargeur === 0) conteneurLargeur = window.innerWidth - 340;
+
             let largeurCalculee = distanceTotale * 120;
-            let targetWidth = isFitView ? conteneurLargeur : Math.max(conteneurLargeur, largeurCalculee); 
+            let targetWidth = isFitView ? conteneurLargeur : Math.max(conteneurLargeur, largeurCalculee);
             document.querySelector('.chart-wrapper').style.width = targetWidth + "px";
 
             let minAlt = Math.min(...donneesAltitude); let maxAlt = Math.max(...donneesAltitude);
-            let amplitudeVisuelle = Math.max(maxAlt - minAlt, 30); 
-            let margeY = amplitudeVisuelle * 0.10; 
+            let amplitudeVisuelle = Math.max(maxAlt - minAlt, 30);
+            let margeY = amplitudeVisuelle * 0.10;
             let yMin = Math.floor(minAlt - margeY); let yMax = Math.ceil(minAlt + amplitudeVisuelle + margeY);
 
             const ctx = document.getElementById('elevationChart').getContext('2d');
@@ -712,14 +740,12 @@ function traiterReliefDepuisTracé(coordinates3D, distanceTotalKm) {
                         segment: {
                             borderColor: context => {
                                 const i = context.p0DataIndex;
-                                if(i === undefined || rawDistances[i+1] === undefined) return getCouleurPente(0); 
-                                
-                                // Calcul de pente sur fenêtre large pour lisser le visuel (Point précédent à Point suivant)
+                                if(i === undefined || rawDistances[i+1] === undefined) return getCouleurPente(0);
+
                                 let idxPrev = Math.max(0, i - 1);
                                 let idxNext = Math.min(donneesAltitude.length - 1, i + 1);
                                 let dAlt = donneesAltitude[idxNext] - donneesAltitude[idxPrev];
-                                let dDist = rawDistances[idxNext] - rawDistances[idxPrev]; 
-                                
+                                let dDist = rawDistances[idxNext] - rawDistances[idxPrev];
                                 let pentePourcentage = dDist > 0 ? Math.abs((dAlt / dDist) * 100) : 0;
                                 return getCouleurPente(pentePourcentage);
                             }
@@ -728,7 +754,7 @@ function traiterReliefDepuisTracé(coordinates3D, distanceTotalKm) {
                 },
                 options: {
                     responsive: true, maintainAspectRatio: false, animation: { duration: 0 },
-                    plugins: { 
+                    plugins: {
                         legend: { display: false },
                         tooltip: {
                             mode: 'index', intersect: false,
@@ -737,7 +763,7 @@ function traiterReliefDepuisTracé(coordinates3D, distanceTotalKm) {
                                 label: (context) => {
                                     let idx = context.dataIndex; let alt = context.parsed.y;
                                     let dPlus = datasetDPlusCumule[idx] || 0; let dMoins = datasetDMoinsCumule[idx] || 0;
-                                    
+
                                     let penteActuelleStr = "Plat";
                                     let idxPrev = Math.max(0, idx - 1);
                                     let idxNext = Math.min(donneesAltitude.length - 1, idx + 1);
@@ -746,7 +772,6 @@ function traiterReliefDepuisTracé(coordinates3D, distanceTotalKm) {
                                         let dA = donneesAltitude[idxNext] - donneesAltitude[idxPrev];
                                         penteActuelleStr = ((dA / dD) * 100).toFixed(1) + "%";
                                     }
-                                    
                                     return [ ` Altitude : ${alt.toFixed(0)} m`, ` Pente à ce point : ${penteActuelleStr}`, ` Cumul D+ : +${dPlus} m`, ` Cumul D- : -${dMoins} m` ];
                                 }
                             }
@@ -757,8 +782,8 @@ function traiterReliefDepuisTracé(coordinates3D, distanceTotalKm) {
                         if (activeElements && activeElements.length > 0 && globalCoordinates.length > 0) {
                             const chartIndex = activeElements[0].index;
                             const globalIndex = coordinateMappingIndices[chartIndex];
-                            
-                            let couleurCurseur = '#3498db'; 
+
+                            let couleurCurseur = '#3498db';
                             let idxPrev = Math.max(0, chartIndex - 1);
                             let idxNext = Math.min(lastAltitudes.length - 1, chartIndex + 1);
                             let dD = lastRawDistances[idxNext] - lastRawDistances[idxPrev];
@@ -791,141 +816,123 @@ function traiterReliefDepuisTracé(coordinates3D, distanceTotalKm) {
             });
         }
 
-       // Trace les segments sur la carte + marqueurs spéciaux
-function afficherLigneSurCarte(coordinates, distanceTotalKm, dPlus, dMoins, indexOrigine = [], donneesAltitude = [], rawDistances = []) {
-    globalCoordinates = coordinates;
-    totalCalculatedDistance = distanceTotalKm;
-    totalCalculatedDPlus = dPlus;
-    totalCalculatedDMoins = dMoins;
-    visu3dBtn.disabled = false;  // Active le bouton 3D
+        // --- AFFICHAGE DU TRACÉ SUR LA CARTE ---
+        function afficherLigneSurCarte(coordinates, distanceTotalKm, dPlus, dMoins, indexOrigine = [], donneesAltitude = [], rawDistances = []) {
+            globalCoordinates = coordinates;
+            totalCalculatedDistance = distanceTotalKm;
+            totalCalculatedDPlus = dPlus;
+            totalCalculatedDMoins = dMoins;
+            visu3dBtn.disabled = false;
 
-    // Nettoyage des marqueurs spéciaux (départ/arrivée/sommets)
-    specialMarkersGroup.clearLayers();
+            specialMarkersGroup.clearLayers();
 
-    if (routeLayer) map.removeLayer(routeLayer);
-    routeLayer = L.featureGroup().addTo(map);
+            if (routeLayer) map.removeLayer(routeLayer);
+            routeLayer = L.featureGroup().addTo(map);
 
-    // --- TRACÉ DES SEGMENTS (coloriés selon la pente) ---
-    if (!indexOrigine || indexOrigine.length === 0) {
-        // Cas sans indexOrigine (tracé simple)
-        const leafletCoords = coordinates.map(pt => [pt.lat, pt.lng]);
-        L.polyline(leafletCoords, { color: '#2980b9', weight: 5, opacity: 0.9 }).addTo(routeLayer);
-    } else {
-        // Cas avec indexOrigine (tracé segmenté avec couleurs de pente)
-        for (let i = 0; i < indexOrigine.length - 1; i++) {
-            let idxStart = indexOrigine[i];
-            let idxEnd = indexOrigine[i+1];
-            let chunkCoords = [];
-            for (let j = idxStart; j <= idxEnd; j++) {
-                chunkCoords.push([coordinates[j].lat, coordinates[j].lng]);
+            if (!indexOrigine || indexOrigine.length === 0) {
+                const leafletCoords = coordinates.map(pt => [pt.lat, pt.lng]);
+                L.polyline(leafletCoords, { color: '#2980b9', weight: 5, opacity: 0.9 }).addTo(routeLayer);
+            } else {
+                for (let i = 0; i < indexOrigine.length - 1; i++) {
+                    let idxStart = indexOrigine[i];
+                    let idxEnd = indexOrigine[i+1];
+                    let chunkCoords = [];
+                    for (let j = idxStart; j <= idxEnd; j++) {
+                        chunkCoords.push([coordinates[j].lat, coordinates[j].lng]);
+                    }
+                    let idxPrev = Math.max(0, i - 1);
+                    let idxNext = Math.min(donneesAltitude.length - 1, i + 1);
+                    let dAlt = donneesAltitude[idxNext] - donneesAltitude[idxPrev];
+                    let dDist = rawDistances[idxNext] - rawDistances[idxPrev];
+                    let pentePourcentage = dDist > 0 ? Math.abs((dAlt / dDist) * 100) : 0;
+                    let couleurSegment = getCouleurPente(pentePourcentage);
+                    L.polyline(chunkCoords, { color: couleurSegment, weight: 6, opacity: 1 }).addTo(routeLayer);
+                }
             }
-            // Calcul de la pente pour ce segment
-            let idxPrev = Math.max(0, i - 1);
-            let idxNext = Math.min(donneesAltitude.length - 1, i + 1);
-            let dAlt = donneesAltitude[idxNext] - donneesAltitude[idxPrev];
-            let dDist = rawDistances[idxNext] - rawDistances[idxPrev];
-            let pentePourcentage = dDist > 0 ? Math.abs((dAlt / dDist) * 100) : 0;
-            let couleurSegment = getCouleurPente(pentePourcentage);
-            L.polyline(chunkCoords, { color: couleurSegment, weight: 6, opacity: 1 }).addTo(routeLayer);
-        }
-    }
 
-    // --- MARQUEURS SPÉCIAUX (départ, arrivée, sommets) ---
-    if (coordinates.length > 0) {
-        // 1️⃣ DÉPART (toujours le premier point)
-        L.marker([coordinates[0].lat, coordinates[0].lng], {
-            icon: startIcon,
-            zIndexOffset: 1000
-        }).addTo(specialMarkersGroup).bindPopup("<b>📍 Départ</b>");
-
-        // 2️⃣ ARRIVÉE (dernier point, si différent du départ)
-        if (coordinates.length > 1) {
-            const lastCoord = coordinates[coordinates.length - 1];
-            if (lastCoord.lat !== coordinates[0].lat || lastCoord.lng !== coordinates[0].lng) {
-                L.marker([lastCoord.lat, lastCoord.lng], {
-                    icon: endIcon,
+            if (coordinates.length > 0) {
+                L.marker([coordinates[0].lat, coordinates[0].lng], {
+                    icon: startIcon,
                     zIndexOffset: 1000
-                }).addTo(specialMarkersGroup).bindPopup("<b>🏁 Arrivée</b>");
-            }
-        }
+                }).addTo(specialMarkersGroup).bindPopup("<b>📍 Départ</b>");
 
-        // 3️⃣ SOMMETS (point le plus haut + points après montée significative)
-        if (donneesAltitude && donneesAltitude.length > 2 && rawDistances && rawDistances.length > 2) {
-            // --- POINT LE PLUS HAUT (toujours affiché) ---
-            const maxAlt = Math.max(...donneesAltitude);
-            const maxIndex = donneesAltitude.indexOf(maxAlt);
-            const maxSummitIndex = indexOrigine[maxIndex] !== undefined ? indexOrigine[maxIndex] : maxIndex;
-            L.marker([coordinates[maxSummitIndex].lat, coordinates[maxSummitIndex].lng], {
-                icon: summitIcon,
-                zIndexOffset: 1000
-            }).addTo(specialMarkersGroup)
-              .bindPopup(`<b>⛰️ Point le plus haut</b><br>Altitude: ${Math.round(maxAlt)} m`);
-
-            // --- AUTRES POINTS HAUTS (après montée significative) ---
-            const MIN_DISTANCE = 500;   // 500m entre chaque marqueur
-            const MIN_ELEVATION = 30;    // 30m de dénivelé minimum
-            const PEAK_THRESHOLD = 10;   // 10m pour considérer un pic local
-
-            let lastMarkerIndex = -1;
-            let lastMarkerAlt = donneesAltitude[0];
-            let lastMarkerDist = 0;
-
-            for (let i = 1; i < donneesAltitude.length - 1; i++) {
-                const prevAlt = donneesAltitude[i-1];
-                const currAlt = donneesAltitude[i];
-                const nextAlt = donneesAltitude[i+1];
-                const currDist = rawDistances[i];
-
-                // 1. Est-ce un pic local ?
-                if (currAlt > prevAlt + PEAK_THRESHOLD && currAlt > nextAlt + PEAK_THRESHOLD) {
-                    const summitIndex = indexOrigine[i] !== undefined ? indexOrigine[i] : i;
-
-                    // 2. Est-ce assez éloigné ET avec assez de dénivelé depuis le dernier marqueur ?
-                    if (lastMarkerIndex === -1 ||
-                        (currDist - lastMarkerDist >= MIN_DISTANCE &&
-                         currAlt - lastMarkerAlt >= MIN_ELEVATION)) {
-
-                        L.marker([coordinates[summitIndex].lat, coordinates[summitIndex].lng], {
-                            icon: summitIcon,
+                if (coordinates.length > 1) {
+                    const lastCoord = coordinates[coordinates.length - 1];
+                    if (lastCoord.lat !== coordinates[0].lat || lastCoord.lng !== coordinates[0].lng) {
+                        L.marker([lastCoord.lat, lastCoord.lng], {
+                            icon: endIcon,
                             zIndexOffset: 1000
-                        }).addTo(specialMarkersGroup)
-                          .bindPopup(`<b>⛰️ Point haut</b><br>Altitude: ${Math.round(currAlt)} m`);
+                        }).addTo(specialMarkersGroup).bindPopup("<b>🏁 Arrivée</b>");
+                    }
+                }
 
-                        lastMarkerIndex = i;
-                        lastMarkerAlt = currAlt;
-                        lastMarkerDist = currDist;
+                if (donneesAltitude && donneesAltitude.length > 2 && rawDistances && rawDistances.length > 2) {
+                    const maxAlt = Math.max(...donneesAltitude);
+                    const maxIndex = donneesAltitude.indexOf(maxAlt);
+                    const maxSummitIndex = indexOrigine[maxIndex] !== undefined ? indexOrigine[maxIndex] : maxIndex;
+                    L.marker([coordinates[maxSummitIndex].lat, coordinates[maxSummitIndex].lng], {
+                        icon: summitIcon,
+                        zIndexOffset: 1000
+                    }).addTo(specialMarkersGroup)
+                      .bindPopup(`<b>⛰️ Point le plus haut</b><br>Altitude: ${Math.round(maxAlt)} m`);
+
+                    const MIN_DISTANCE = 500;
+                    const MIN_ELEVATION = 30;
+                    const PEAK_THRESHOLD = 10;
+
+                    let lastMarkerIndex = -1;
+                    let lastMarkerAlt = donneesAltitude[0];
+                    let lastMarkerDist = 0;
+
+                    for (let i = 1; i < donneesAltitude.length - 1; i++) {
+                        const prevAlt = donneesAltitude[i-1];
+                        const currAlt = donneesAltitude[i];
+                        const nextAlt = donneesAltitude[i+1];
+                        const currDist = rawDistances[i];
+
+                        if (currAlt > prevAlt + PEAK_THRESHOLD && currAlt > nextAlt + PEAK_THRESHOLD) {
+                            const summitIndex = indexOrigine[i] !== undefined ? indexOrigine[i] : i;
+                            if (lastMarkerIndex === -1 ||
+                                (currDist - lastMarkerDist >= MIN_DISTANCE &&
+                                 currAlt - lastMarkerAlt >= MIN_ELEVATION)) {
+                                L.marker([coordinates[summitIndex].lat, coordinates[summitIndex].lng], {
+                                    icon: summitIcon,
+                                    zIndexOffset: 1000
+                                }).addTo(specialMarkersGroup)
+                                  .bindPopup(`<b>⛰️ Point haut</b><br>Altitude: ${Math.round(currAlt)} m`);
+                                lastMarkerIndex = i;
+                                lastMarkerAlt = currAlt;
+                                lastMarkerDist = currDist;
+                            }
+                        }
                     }
                 }
             }
+
+            let bounds = routeLayer.getBounds();
+            map.fitBounds(bounds, { maxZoom: map.getZoom(), padding: [20, 20] });
+
+            gpxBtn.disabled = false;
+            reverseBtn.disabled = false; // Active le bouton après affichage
+            calculEstimationDuree();
         }
-    }
 
-    // Centrage de la carte
-    let bounds = routeLayer.getBounds();
-    map.fitBounds(bounds, { maxZoom: map.getZoom(), padding: [20, 20] });
-
-    gpxBtn.disabled = false;
-    calculEstimationDuree();
-}
-
-        // Sync souris de la carte vers le profil altimétrique
+        // --- SYNCHRONISATION SOURIS CARTE/PROFIL ---
         map.on('mousemove', (e) => {
             if (!elevationChart || globalCoordinates.length === 0) return;
-
             const mouseLatLng = e.latlng;
             let plusProcheGlobalIndex = 0;
             let distanceMin = Infinity;
 
             for (let i = 0; i < globalCoordinates.length; i++) {
                 let ptLatLng = L.latLng(globalCoordinates[i].lat, globalCoordinates[i].lng);
-                let d = mouseLatLng.distanceTo(ptLatLng); 
+                let d = mouseLatLng.distanceTo(ptLatLng);
                 if (d < distanceMin) { distanceMin = d; plusProcheGlobalIndex = i; }
             }
 
             if (distanceMin < 40) {
                 let plusProcheChartIndex = 0;
                 let diffMin = Infinity;
-                
                 for (let j = 0; j < coordinateMappingIndices.length; j++) {
                     let diff = Math.abs(coordinateMappingIndices[j] - plusProcheGlobalIndex);
                     if (diff < diffMin) { diffMin = diff; plusProcheChartIndex = j; }
@@ -933,14 +940,14 @@ function afficherLigneSurCarte(coordinates, distanceTotalKm, dPlus, dMoins, inde
 
                 const meta = elevationChart.getDatasetMeta(0);
                 const point = meta.data[plusProcheChartIndex];
-                
+
                 if (point) {
                     elevationChart.setActiveElements([{ datasetIndex: 0, index: plusProcheChartIndex }]);
                     elevationChart.tooltip.setActiveElements([{ datasetIndex: 0, index: plusProcheChartIndex }], { x: point.x, y: point.y });
                     elevationChart.update();
                 }
 
-                let couleurCurseur = '#3498db'; 
+                let couleurCurseur = '#3498db';
                 let idxPrev = Math.max(0, plusProcheChartIndex - 1);
                 let idxNext = Math.min(lastAltitudes.length - 1, plusProcheChartIndex + 1);
                 let dD = lastRawDistances[idxNext] - lastRawDistances[idxPrev];
@@ -967,19 +974,19 @@ function afficherLigneSurCarte(coordinates, distanceTotalKm, dPlus, dMoins, inde
 
         // --- RESET ET EXPORT ---
         function nettoyerCarte() {
-    waypoints = [];
-    markersGroup.clearLayers();
-    specialMarkersGroup.clearLayers(); // Nettoyage des marqueurs spéciaux
-    if (routeLayer) map.removeLayer(routeLayer);
-    if (hoverMarker) { map.removeLayer(hoverMarker); hoverMarker = null; }
-    totalCalculatedDistance = 0; totalCalculatedDPlus = 0; totalCalculatedDMoins = 0;
-    globalCoordinates = []; coordinateMappingIndices = []; datasetDPlusCumule = []; datasetDMoinsCumule = [];
-    routeBtn.disabled = true; nextBtn.disabled = true; gpxBtn.disabled = true;
-    if (elevationChart) { elevationChart.destroy(); elevationChart = null; }
-    elevationOuter.style.display = "none";
-    map.invalidateSize();
-    visu3dBtn.disabled = true;  // Désactive le bouton 3D
-}
+            waypoints = [];
+            markersGroup.clearLayers();
+            specialMarkersGroup.clearLayers();
+            if (routeLayer) map.removeLayer(routeLayer);
+            if (hoverMarker) { map.removeLayer(hoverMarker); hoverMarker = null; }
+            totalCalculatedDistance = 0; totalCalculatedDPlus = 0; totalCalculatedDMoins = 0;
+            globalCoordinates = []; coordinateMappingIndices = []; datasetDPlusCumule = []; datasetDMoinsCumule = [];
+            routeBtn.disabled = true; nextBtn.disabled = true; gpxBtn.disabled = true; reverseBtn.disabled = true;
+            if (elevationChart) { elevationChart.destroy(); elevationChart = null; }
+            elevationOuter.style.display = "none";
+            map.invalidateSize();
+            visu3dBtn.disabled = true;
+        }
 
         function calculEstimationDuree() {
             if (totalCalculatedDistance === 0) return;
@@ -1011,161 +1018,138 @@ function afficherLigneSurCarte(coordinates, distanceTotalKm, dPlus, dMoins, inde
         });
 
         // --- IMPORT GPX ---
-const importGpxBtn = document.getElementById('import-gpx-btn');
-const gpxFileInput = document.getElementById('gpx-file-input');
+        const importGpxBtn = document.getElementById('import-gpx-btn');
+        const gpxFileInput = document.getElementById('gpx-file-input');
 
-importGpxBtn.addEventListener('click', () => gpxFileInput.click());
+        importGpxBtn.addEventListener('click', () => gpxFileInput.click());
 
-gpxFileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+        gpxFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            document.getElementById('info').innerText = "⏳ Lecture du fichier GPX...";
 
-    document.getElementById('info').innerText = "⏳ Lecture du fichier GPX...";
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-        try {
-            const gpxText = event.target.result;
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(gpxText, "text/xml");
-
-            // Extraction des points de trace (trkpt)
-            const trkpts = xmlDoc.getElementsByTagName("trkpt");
-            if (trkpts.length === 0) {
-                throw new Error("Aucun point de trace (trkpt) trouvé dans le GPX.");
-            }
-
-            // Nettoyage de la carte avant import
-            nettoyerCarte();
-
-            // Récupération des coordonnées et altitudes
-            let importedCoordinates = [];
-            for (let i = 0; i < trkpts.length; i++) {
-                const lat = parseFloat(trkpts[i].getAttribute("lat"));
-                const lng = parseFloat(trkpts[i].getAttribute("lon"));
-                const ele = parseFloat(trkpts[i].getElementsByTagName("ele")[0]?.textContent) || null;
-                importedCoordinates.push({ lat, lng, alt: ele });
-            }
-
-            // Affichage du tracé et calcul du profil
-            if (importedCoordinates.length > 0) {
-                // Création d'un waypoint pour le départ (pour la compatibilité avec l'UI)
-                waypoints.push({
-                    lat: importedCoordinates[0].lat,
-                    lng: importedCoordinates[0].lng,
-                    method: 'auto'
-                });
-                reconstruireMarqueurs();
-
-                // Calcul de la distance totale pour l'affichage
-                let totalDistance = 0;
-                for (let i = 1; i < importedCoordinates.length; i++) {
-                    totalDistance += calculerDistanceEntreDeuxPoints(
-                        importedCoordinates[i-1].lat, importedCoordinates[i-1].lng,
-                        importedCoordinates[i].lat, importedCoordinates[i].lng
-                    );
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const gpxText = event.target.result;
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(gpxText, "text/xml");
+                    const trkpts = xmlDoc.getElementsByTagName("trkpt");
+                    if (trkpts.length === 0) {
+                        throw new Error("Aucun point de trace (trkpt) trouvé dans le GPX.");
+                    }
+                    nettoyerCarte();
+                    let importedCoordinates = [];
+                    for (let i = 0; i < trkpts.length; i++) {
+                        const lat = parseFloat(trkpts[i].getAttribute("lat"));
+                        const lng = parseFloat(trkpts[i].getAttribute("lon"));
+                        const ele = parseFloat(trkpts[i].getElementsByTagName("ele")[0]?.textContent) || null;
+                        importedCoordinates.push({ lat, lng, alt: ele });
+                    }
+                    if (importedCoordinates.length > 0) {
+                        waypoints.push({ lat: importedCoordinates[0].lat, lng: importedCoordinates[0].lng, method: 'auto' });
+                        reconstruireMarqueurs();
+                        let totalDistance = 0;
+                        for (let i = 1; i < importedCoordinates.length; i++) {
+                            totalDistance += calculerDistanceEntreDeuxPoints(
+                                importedCoordinates[i-1].lat, importedCoordinates[i-1].lng,
+                                importedCoordinates[i].lat, importedCoordinates[i].lng
+                            );
+                        }
+                        traiterReliefDepuisTracé(importedCoordinates, totalDistance);
+                    }
+                } catch (error) {
+                    document.getElementById('info').innerText = `❌ Erreur: ${error.message || "Fichier GPX invalide."}`;
+                    nettoyerCarte();
+                } finally {
+                    gpxFileInput.value = "";
                 }
+            };
+            reader.readAsText(file);
+        });
 
-                // Traitement du relief (comme pour un tracé généré)
-                traiterReliefDepuisTracé(importedCoordinates, totalDistance);
+        // --- BOUTON VISUALISATION 3D ---
+        const visu3dBtn = document.getElementById('visu3d-btn');
+        function ouvrirDansVisuGPX() {
+            if (globalCoordinates.length === 0) return;
+            let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Éditeur Outdoor PRO" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk>\n    <name>Mon Tracé Outdoor</name>\n    <trkseg>\n`;
+            for (let i = 0; i < globalCoordinates.length; i++) {
+                gpxContent += `      <trkpt lat="${globalCoordinates[i].lat.toFixed(6)}" lon="${globalCoordinates[i].lng.toFixed(6)}"></trkpt>\n`;
             }
-        } catch (error) {
-            document.getElementById('info').innerText = `❌ Erreur: ${error.message || "Fichier GPX invalide."}`;
-            nettoyerCarte();
-        } finally {
-            gpxFileInput.value = ""; // Réinitialisation de l'input
+            gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
+            const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'ma_trace_outdoor.gpx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            setTimeout(() => {
+                window.open('https://www.visugpx.com/editgpx/', '_blank');
+                document.getElementById('info').innerText = "✅ Fichier 'ma_trace_outdoor.gpx' téléchargé ! Sur VisuGPX : cliquez sur 'Ouvrir GPX' → Sélectionnez le fichier dans vos téléchargements.";
+            }, 800);
         }
-    };
-    reader.readAsText(file);
-});
-    // --- BOUTON VISUALISATION 3D (téléchargement + ouverture) ---
-const visu3dBtn = document.getElementById('visu3d-btn');
+        visu3dBtn.addEventListener('click', ouvrirDansVisuGPX);
 
-function ouvrirDansVisuGPX() {
-    if (globalCoordinates.length === 0) return;
+        // --- RECHERCHE DE COMMUNES ---
+        const searchInput = document.getElementById('search-input');
+        const searchBtn = document.getElementById('search-btn');
+        const searchResults = document.getElementById('search-results');
+        let searchTimeout;
 
-    // 1. Générer le GPX
-    let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Éditeur Outdoor PRO" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk>\n    <name>Mon Tracé Outdoor</name>\n    <trkseg>\n`;
-    for (let i = 0; i < globalCoordinates.length; i++) {
-        gpxContent += `      <trkpt lat="${globalCoordinates[i].lat.toFixed(6)}" lon="${globalCoordinates[i].lng.toFixed(6)}"></trkpt>\n`;
-    }
-    gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
-
-    // 2. Télécharger automatiquement le fichier GPX
-    const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'ma_trace_outdoor.gpx';  // Nom de fichier clair
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    // 3. Ouvrir VisuGPX après un délai (pour laisser le temps au téléchargement)
-    setTimeout(() => {
-        window.open('https://www.visugpx.com/editgpx/', '_blank');
-        document.getElementById('info').innerText = "✅ Fichier 'ma_trace_outdoor.gpx' téléchargé ! Sur VisuGPX : cliquez sur 'Ouvrir GPX' → Sélectionnez le fichier dans vos téléchargements.";
-    }, 800);  // Délai de 800ms pour le téléchargement
-}
-
-visu3dBtn.addEventListener('click', ouvrirDansVisuGPX);
-
-// --- RECHERCHE DE COMMUNES ---
-const searchInput = document.getElementById('search-input');
-const searchBtn = document.getElementById('search-btn');
-const searchResults = document.getElementById('search-results');
-let searchTimeout;
-
-searchInput.addEventListener('input', () => {
-    if (searchInput.value.length < 2) {
-        searchResults.style.display = 'none';
-        return;
-    }
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(rechercherCommunes, 300);
-});
-
-searchBtn.addEventListener('click', rechercherCommunes);
-
-function rechercherCommunes() {
-    const query = searchInput.value.trim();
-    if (query.length < 2) return;
-
-    // 👇 API Adresse (officielle, CORS activé)
-    const apiUrl = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&type=municipality&autocomplete=1&limit=5`;
-
-    fetch(apiUrl)
-        .then(response => response.json())
-        .then(data => {
-            if (!data.features || data.features.length === 0) {
-                searchResults.innerHTML = '<div style="color: #e74c3c; padding: 6px;">Aucun résultat trouvé</div>';
-                searchResults.style.display = 'block';
+        searchInput.addEventListener('input', () => {
+            if (searchInput.value.length < 2) {
+                searchResults.style.display = 'none';
                 return;
             }
-            searchResults.innerHTML = '';
-            data.features.forEach(feature => {
-                const commune = feature.properties.label;
-                const [lon, lat] = feature.geometry.coordinates;
-                const div = document.createElement('div');
-                div.textContent = commune;
-                div.dataset.lat = lat;
-                div.dataset.lon = lon;
-                div.addEventListener('click', () => {
-                    map.setView([lat, lon], 14);
-                    searchResults.style.display = 'none';
-                    searchInput.value = commune;
-                });
-                searchResults.appendChild(div);
-            });
-            searchResults.style.display = 'block';
-        })
-        .catch(error => {
-            searchResults.innerHTML = '<div style="color: #e74c3c; padding: 6px;">Erreur de connexion</div>';
-            searchResults.style.display = 'block';
-            console.error("Erreur API Adresse:", error);
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(rechercherCommunes, 300);
         });
-}
+
+        searchBtn.addEventListener('click', rechercherCommunes);
+
+        function rechercherCommunes() {
+            const query = searchInput.value.trim();
+            if (query.length < 2) return;
+            const apiUrl = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&type=municipality&autocomplete=1&limit=5`;
+            fetch(apiUrl)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.features || data.features.length === 0) {
+                        searchResults.innerHTML = '<div style="color: #e74c3c; padding: 6px;">Aucun résultat trouvé</div>';
+                        searchResults.style.display = 'block';
+                        return;
+                    }
+                    searchResults.innerHTML = '';
+                    data.features.forEach(feature => {
+                        const commune = feature.properties.label;
+                        const [lon, lat] = feature.geometry.coordinates;
+                        const div = document.createElement('div');
+                        div.textContent = commune;
+                        div.dataset.lat = lat;
+                        div.dataset.lon = lon;
+                        div.addEventListener('click', () => {
+                            map.setView([lat, lon], 14);
+                            searchResults.style.display = 'none';
+                            searchInput.value = commune;
+                        });
+                        searchResults.appendChild(div);
+                    });
+                    searchResults.style.display = 'block';
+                })
+                .catch(error => {
+                    searchResults.innerHTML = '<div style="color: #e74c3c; padding: 6px;">Erreur de connexion</div>';
+                    searchResults.style.display = 'block';
+                    console.error("Erreur API Adresse:", error);
+                });
+        }
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#search-group')) {
+                searchResults.style.display = 'none';
+            }
+        });
     </script>
 </body>
 </html>
