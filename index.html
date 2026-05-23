@@ -461,23 +461,24 @@
 
         // --- NOUVELLE FONCTION : INVERSER LE SENS DU PARCOURS ---
         function inverserSensParcours() {
-            if (waypoints.length < 2) return;
+    if (waypoints.length < 2) return;
 
-            const formatChoisi = document.querySelector('input[name="format"]:checked').value;
-            if (formatChoisi === "boucle") {
-                // Pour une boucle : on inverse tous les waypoints SAUF le premier (départ)
-                const depart = waypoints[0];
-                const autresPoints = waypoints.slice(1).reverse();
-                waypoints = [depart, ...autresPoints];
-            } else {
-                // Pour un aller-retour : on inverse simplement tout
-                waypoints.reverse();
-            }
+    const formatChoisi = document.querySelector('input[name="format"]:checked').value;
 
-            reconstruireMarqueurs();
-            générerTracéMaitre();
-            document.getElementById('info').innerText = "🔀 Sens du parcours inversé !";
-        }
+    if (formatChoisi === "boucle") {
+        // Pour une boucle : on garde le départ et on inverse les autres points
+        const depart = waypoints[0];
+        const autresPoints = waypoints.slice(1).reverse();
+        waypoints = [depart, ...autresPoints];
+    } else {
+        // Pour un aller-retour : on inverse tous les points
+        waypoints.reverse();
+    }
+
+    reconstruireMarqueurs();
+    générerTracéMaitre();
+    document.getElementById('info').innerText = "🔀 Sens du parcours inversé !";
+}
 
         document.getElementById('undo-btn').addEventListener('click', () => {
             if (waypoints.length > 0) {
@@ -494,84 +495,87 @@
         function générerTracéMaitre() { générerParcoursHybride(1.0); }
 
         async function générerParcoursHybride(facteurEchelle, iteration = 0) {
-            if (waypoints.length === 0) return;
+    if (waypoints.length === 0) return;
 
-            const distanceChoisie = parseFloat(distanceSlider.value);
-            const formatChoisi = document.querySelector('input[name="format"]:checked').value;
-            let segmentsAVisiter = [];
+    const distanceChoisie = parseFloat(distanceSlider.value);
+    const formatChoisi = document.querySelector('input[name="format"]:checked').value;
+    let segmentsAVisiter = [];
 
-            if (currentMode === 'manual' || waypoints.length > 1) {
-                segmentsAVisiter = [...waypoints];
-                if (formatChoisi === "boucle" && waypoints.length > 1) segmentsAVisiter.push({lat: waypoints[0].lat, lng: waypoints[0].lng, method: drawingMethod});
-            } else {
-                const start = waypoints[0]; segmentsAVisiter.push(start);
-                if (formatChoisi === "aller-retour") {
-                    const cap = (distanceChoisie / 2) * 0.0065 * 0.72 * facteurEchelle;
-                    segmentsAVisiter.push({ lat: start.lat + cap * Math.cos(currentAngleOffset), lng: start.lng + cap * Math.sin(currentAngleOffset), method: 'auto' });
-                } else {
-                    const rayon = (distanceChoisie / (2 * Math.PI)) * 0.008 * facteurEchelle;
-                    const nbPoints = 6;
+    if (currentMode === 'manual' || waypoints.length > 1) {
+        segmentsAVisiter = [...waypoints];
+        if (formatChoisi === "boucle" && waypoints.length > 1) segmentsAVisiter.push({lat: waypoints[0].lat, lng: waypoints[0].lng, method: drawingMethod});
+    } else {
+        const start = waypoints[0]; segmentsAVisiter.push(start);
+        if (formatChoisi === "aller-retour") {
+            const cap = (distanceChoisie / 2) * 0.0065 * 0.72 * facteurEchelle;
+            segmentsAVisiter.push({ lat: start.lat + cap * Math.cos(currentAngleOffset), lng: start.lng + cap * Math.sin(currentAngleOffset), method: 'auto' });
+        } else {
+            const rayon = (distanceChoisie / (2 * Math.PI)) * 0.008 * facteurEchelle;
+            const nbPoints = 6;
+            for (let i = 1; i <= nbPoints; i++) {
+                const angle = currentAngleOffset + (2 * Math.PI * i / nbPoints);
+                segmentsAVisiter.push({
+                    lat: start.lat + rayon * Math.cos(angle),
+                    lng: start.lng + rayon * Math.sin(angle),
+                    method: 'auto'
+                });
+            }
+            segmentsAVisiter.push({lat: start.lat, lng: start.lng, method: 'auto'});
+        }
+    }
+    document.getElementById('info').innerText = "Calcul du tracé...";
+    let fullCoordinates = [];
+    let distanceTotaleCumulee = 0;
 
-                    for (let i = 1; i <= nbPoints; i++) {
-                        const angle = currentAngleOffset + (2 * Math.PI * i / nbPoints);
-                        segmentsAVisiter.push({
-                            lat: start.lat + rayon * Math.cos(angle),
-                            lng: start.lng + rayon * Math.sin(angle),
-                            method: 'auto'
-                        });
-                    }
-                    segmentsAVisiter.push({lat: start.lat, lng: start.lng, method: 'auto'});
+    for (let i = 0; i < segmentsAVisiter.length; i++) {
+        if (i === 0) { fullCoordinates.push({lat: segmentsAVisiter[0].lat, lng: segmentsAVisiter[0].lng, alt: 280}); continue; }
+        let ptPrecedent = segmentsAVisiter[i - 1]; let ptActuel = segmentsAVisiter[i];
+
+        if (ptActuel.method === 'manual') {
+            let distSegment = calculerDistanceEntreDeuxPoints(ptPrecedent.lat, ptPrecedent.lng, ptActuel.lat, ptActuel.lng);
+            let nbEtapes = Math.max(1, Math.floor((distSegment * 1000) / 30));
+            for(let etp = 1; etp <= nbEtapes; etp++) {
+                let fraction = etp / nbEtapes;
+                let latInterp = ptPrecedent.lat + (ptActuel.lat - ptPrecedent.lat) * fraction;
+                let lngInterp = ptPrecedent.lng + (ptActuel.lng - ptPrecedent.lng) * fraction;
+                fullCoordinates.push({lat: latInterp, lng: lngInterp, alt: fullCoordinates[fullCoordinates.length - 1]?.alt || 280});
+            }
+            distanceTotaleCumulee += distSegment;
+        } else {
+            try {
+                let urlSegment = "https://brouter.de/brouter?lonlats=" + ptPrecedent.lng.toFixed(6) + "," + ptPrecedent.lat.toFixed(6) + "|" + ptActuel.lng.toFixed(6) + "," + ptActuel.lat.toFixed(6) + "&profile=trekking&alternativeidx=0&format=geojson";
+                let response = await fetch(urlSegment);
+                if (!response.ok) throw new Error();
+                let data = await response.json();
+                if (data.features && data.features[0] && data.features[0].geometry) {
+                    let pointsSegment = data.features[0].geometry.coordinates;
+                    let coordProtegees = pointsSegment.map(pt => ({ lat: pt[1], lng: pt[0], alt: (pt[2] !== undefined && pt[2] !== null) ? pt[2] : (fullCoordinates[fullCoordinates.length - 1]?.alt || 280) }));
+                    fullCoordinates = fullCoordinates.concat(coordProtegees.slice(1));
+                    distanceTotaleCumulee += data.features[0].properties['track-length'] / 1000;
                 }
-            }
-            document.getElementById('info').innerText = "Calcul du tracé...";
-            let fullCoordinates = [];
-            let distanceTotaleCumulee = 0;
-
-            for (let i = 0; i < segmentsAVisiter.length; i++) {
-                if (i === 0) { fullCoordinates.push({lat: segmentsAVisiter[0].lat, lng: segmentsAVisiter[0].lng, alt: 280}); continue; }
-                let ptPrecedent = segmentsAVisiter[i - 1]; let ptActuel = segmentsAVisiter[i];
-
-                if (ptActuel.method === 'manual') {
-                    let distSegment = calculerDistanceEntreDeuxPoints(ptPrecedent.lat, ptPrecedent.lng, ptActuel.lat, ptActuel.lng);
-                    let nbEtapes = Math.max(1, Math.floor((distSegment * 1000) / 30));
-                    for(let etp = 1; etp <= nbEtapes; etp++) {
-                        let fraction = etp / nbEtapes;
-                        let latInterp = ptPrecedent.lat + (ptActuel.lat - ptPrecedent.lat) * fraction;
-                        let lngInterp = ptPrecedent.lng + (ptActuel.lng - ptPrecedent.lng) * fraction;
-                        fullCoordinates.push({lat: latInterp, lng: lngInterp, alt: fullCoordinates[fullCoordinates.length - 1]?.alt || 280});
-                    }
-                    distanceTotaleCumulee += distSegment;
-                } else {
-                    try {
-                        let urlSegment = "https://brouter.de/brouter?lonlats=" + ptPrecedent.lng.toFixed(6) + "," + ptPrecedent.lat.toFixed(6) + "|" + ptActuel.lng.toFixed(6) + "," + ptActuel.lat.toFixed(6) + "&profile=trekking&alternativeidx=0&format=geojson";
-                        let response = await fetch(urlSegment);
-                        if (!response.ok) throw new Error();
-                        let data = await response.json();
-                        if (data.features && data.features[0] && data.features[0].geometry) {
-                            let pointsSegment = data.features[0].geometry.coordinates;
-                            let coordProtegees = pointsSegment.map(pt => ({ lat: pt[1], lng: pt[0], alt: (pt[2] !== undefined && pt[2] !== null) ? pt[2] : (fullCoordinates[fullCoordinates.length - 1]?.alt || 280) }));
-                            fullCoordinates = fullCoordinates.concat(coordProtegees.slice(1));
-                            distanceTotaleCumulee += data.features[0].properties['track-length'] / 1000;
-                        }
-                    } catch (e) {
-                        fullCoordinates.push({lat: ptActuel.lat, lng: ptActuel.lng, alt: fullCoordinates[fullCoordinates.length - 1]?.alt || 280});
-                        distanceTotaleCumulee += calculerDistanceEntreDeuxPoints(ptPrecedent.lat, ptPrecedent.lng, ptActuel.lat, ptActuel.lng);
-                    }
-                }
-            }
-
-            if (formatChoisi === "aller-retour" && currentMode === 'auto') {
-                fullCoordinates = fullCoordinates.concat([...fullCoordinates].reverse());
-                distanceTotaleCumulee = distanceTotaleCumulee * 2;
-            }
-
-            let ratio = distanceChoisie / distanceTotaleCumulee;
-            if ((ratio < 0.92 || ratio > 1.08) && iteration < 4 && currentMode === 'auto') {
-                générerParcoursHybride(facteurEchelle * ratio, iteration + 1);
-            } else {
-                traiterReliefDepuisTracé(fullCoordinates, distanceTotaleCumulee);
+            } catch (e) {
+                fullCoordinates.push({lat: ptActuel.lat, lng: ptActuel.lng, alt: fullCoordinates[fullCoordinates.length - 1]?.alt || 280});
+                distanceTotaleCumulee += calculerDistanceEntreDeuxPoints(ptPrecedent.lat, ptPrecedent.lng, ptActuel.lat, ptActuel.lng);
             }
         }
+    }
+
+    if (formatChoisi === "aller-retour" && currentMode === 'auto') {
+        fullCoordinates = fullCoordinates.concat([...fullCoordinates].reverse());
+        distanceTotaleCumulee = distanceTotaleCumulee * 2;
+    }
+
+    let ratio = distanceChoisie / distanceTotaleCumulee;
+    if ((ratio < 0.92 || ratio > 1.08) && iteration < 4 && currentMode === 'auto') {
+        générerParcoursHybride(facteurEchelle * ratio, iteration + 1);
+    } else {
+        // 👇 NOUVEAU : En mode auto, on met à jour waypoints avec les points du tracé généré
+        if (currentMode === 'auto' && waypoints.length === 1) {
+            waypoints = segmentsAVisiter.map(pt => ({ lat: pt.lat, lng: pt.lng, method: 'auto' }));
+        }
+        traiterReliefDepuisTracé(fullCoordinates, distanceTotaleCumulee);
+    }
+}
 
         // --- GESTION AVANCÉE DU RELIEF ---
         function traiterReliefDepuisTracé(coordinates3D, distanceTotalKm) {
