@@ -484,6 +484,13 @@
 
     reconstruireMarqueurs();
     générerTracéMaitre();
+    // 👇 NOUVEAU : Centrage après inversion
+    setTimeout(() => {
+        if (routeLayer) {
+            map.fitBounds(routeLayer.getBounds(), { maxZoom: map.getZoom(), padding: [20, 20] });
+        }
+    }, 100); // Délai pour laisser le temps au tracé de se redessiner
+
     document.getElementById('info').innerText = "🔀 Sens du parcours inversé !";
 }
 
@@ -699,6 +706,7 @@
                 afficherLigneSurCarte(coordinates3D, distanceTotalKm, totalCalculatedDPlus, totalCalculatedDMoins, indexOrigine, donneesAltitude, rawDistances);
                 dessinerProfilAltimetrique(labelsDistance, donneesAltitude, rawDistances);
                 reverseBtn.disabled = false; // Active le bouton après génération
+            
             })
             .catch((error) => {
                 console.error("Erreur API Open-Meteo:", error);
@@ -714,6 +722,9 @@
                 );
                 document.getElementById('info').innerText = "⚠️ Altitudes non disponibles (API limitée). Profil affiché avec altitude par défaut.";
                 reverseBtn.disabled = false; // Active quand même le bouton
+                if (routeLayer) {
+        map.fitBounds(routeLayer.getBounds(), { maxZoom: map.getZoom(), padding: [20, 20] });
+    }
             });
         }
 
@@ -1068,6 +1079,12 @@
                         }
                         traiterReliefDepuisTracé(importedCoordinates, totalDistance);
                     }
+                        // 👇 NOUVEAU : Centrage après import
+    setTimeout(() => {
+        if (routeLayer) {
+            map.fitBounds(routeLayer.getBounds(), { maxZoom: map.getZoom(), padding: [20, 20] });
+        }
+    }, 100);
                 } catch (error) {
                     document.getElementById('info').innerText = `❌ Erreur: ${error.message || "Fichier GPX invalide."}`;
                     nettoyerCarte();
