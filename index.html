@@ -355,6 +355,7 @@
         const cyclosm = L.tileLayer('https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png', { maxZoom: 20, attribution: '© CyclOSM et OpenStreetMap' });
 
         const map = L.map('map', { center: [46.4632, 4.6582], zoom: 13, layers: [openTopo] });
+        let routeLayer = L.featureGroup().addTo(map);
 
         const fondsDeCarte = {
             "⛰️ OpenTopoMap": openTopo,
@@ -407,7 +408,6 @@
             iconAnchor: [14, 14]
         });
 
-        let routeLayer = null;
         let hoverMarker = null;
         let currentAngleOffset = 0;
         let globalCoordinates = [];
@@ -588,6 +588,10 @@
         routeBtn.addEventListener('click', () => { currentAngleOffset = 0; générerTracéMaitre(); });
         nextBtn.addEventListener('click', () => { currentAngleOffset += 0.8; générerTracéMaitre(); });
         reverseBtn.addEventListener('click', inverserSensParcours); // NOUVEAU
+        document.getElementById('reset-btn').addEventListener('click', () => {
+    nettoyerCarte();
+    document.getElementById('info').innerText = "📍 Cliquez sur la carte pour poser votre point de départ.";
+});
 
         // --- CALCULS DU PARCOURS ---
         function générerTracéMaitre() { générerParcoursHybride(1.0); }
@@ -932,7 +936,7 @@
 
             specialMarkersGroup.clearLayers();
 
-            if (routeLayer) map.removeLayer(routeLayer);
+            
             routeLayer = L.featureGroup().addTo(map);
 
             if (!indexOrigine || indexOrigine.length === 0) {
@@ -1083,6 +1087,7 @@
             markersGroup.clearLayers();
             specialMarkersGroup.clearLayers();
             if (routeLayer) map.removeLayer(routeLayer);
+            routeLayer = null;
             if (hoverMarker) { map.removeLayer(hoverMarker); hoverMarker = null; }
             totalCalculatedDistance = 0; totalCalculatedDPlus = 0; totalCalculatedDMoins = 0;
             globalCoordinates = []; coordinateMappingIndices = []; datasetDPlusCumule = []; datasetDMoinsCumule = [];
