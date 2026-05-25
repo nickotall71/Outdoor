@@ -86,6 +86,78 @@
         #import-gpx-btn { background: #9b59b6; }
         #visu3d-btn { background: #8e44ad; }
 
+        
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 2000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+  background-color: white;
+  margin: 15% auto;
+  padding: 20px;
+  border-radius: 8px;
+  width: 80%;
+  max-width: 400px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+  animation: modalopen 0.3s;
+}
+
+@keyframes modalopen {
+  from {opacity: 0; transform: translateY(-20px);}
+  to {opacity: 1; transform: translateY(0);}
+}
+
+.modal h3 {
+  margin: 0 0 15px 0;
+  text-align: center;
+  color: #2c3e50;
+}
+
+.modal input {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 15px;
+}
+
+.modal-buttons button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+
+#cancel-save-btn {
+  background: #95a5a6;
+  color: white;
+}
+#cancel-save-btn:hover { background: #7f8c8d; }
+
+#confirm-save-btn {
+  background: #2ecc71;
+  color: white;
+}
+#confirm-save-btn:hover { background: #27ae60; }
+
         .chart-wrapper {
             height: 100%;
             position: relative;
@@ -243,7 +315,16 @@
             </div>
         </div>
     </div>
-
+<div id="save-dialog" class="modal">
+  <div class="modal-content">
+    <h3>Nom du fichier GPX</h3>
+    <input type="text" id="filename-input" placeholder="Ex: Mon parcours du 25-05-2026">
+    <div class="modal-buttons">
+      <button id="cancel-save-btn">Annuler</button>
+      <button id="confirm-save-btn">Enregistrer</button>
+    </div>
+  </div>
+</div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
@@ -283,6 +364,19 @@
             "🏙️ Plan standard": planCarto
         };
         L.control.layers(fondsDeCarte, null, { collapsed: false }).addTo(map);
+
+        // --- INTERFACE UI ---
+        const btnAuto = document.getElementById('btn-mode-auto');
+        const btnManual = document.getElementById('btn-mode-manual');
+        const slidersZone = document.getElementById('sliders-zone');
+        const nextBtn = document.getElementById('next-btn');
+        const routeBtn = document.getElementById('route-btn');
+        const gpxBtn = document.getElementById('gpx-btn');
+        const reverseBtn = document.getElementById('reverse-btn'); // NOUVEAU
+        const subDrawingModeContainer = document.getElementById('sub-drawing-mode');
+        const elevationOuter = document.getElementById('elevation-outer');
+        const viewToggleBtn = document.getElementById('view-toggle-btn');
+        const visu3dBtn = document.getElementById('visu3d-btn');
 
         // --- VARIABLES GLOBALES ---
         let currentMode = 'auto';
@@ -350,17 +444,7 @@
             shadowSize: [41, 41]
         });
 
-        // --- INTERFACE UI ---
-        const btnAuto = document.getElementById('btn-mode-auto');
-        const btnManual = document.getElementById('btn-mode-manual');
-        const slidersZone = document.getElementById('sliders-zone');
-        const nextBtn = document.getElementById('next-btn');
-        const routeBtn = document.getElementById('route-btn');
-        const gpxBtn = document.getElementById('gpx-btn');
-        const reverseBtn = document.getElementById('reverse-btn'); // NOUVEAU
-        const subDrawingModeContainer = document.getElementById('sub-drawing-mode');
-        const elevationOuter = document.getElementById('elevation-outer');
-        const viewToggleBtn = document.getElementById('view-toggle-btn');
+        
 
         viewToggleBtn.addEventListener('click', () => {
             isFitView = !isFitView;
@@ -1022,21 +1106,83 @@
                 `⏱️ Durée est. (${formatAllure(allureMinutesDecimale)}) : <span style="color:#3498db;font-size:14px;"><b>${chaineDuree}</b></span>`;
         }
 
-        gpxBtn.addEventListener('click', () => {
-            if (globalCoordinates.length === 0) return;
-            let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Générateur Outdoor" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk>\n    <name>Mon Tracé Outdoor</name>\n    <trkseg>\n`;
-            for (let i = 0; i < globalCoordinates.length; i++) {
-                gpxContent += `      <trkpt lat="${globalCoordinates[i].lat.toFixed(6)}" lon="${globalCoordinates[i].lng.toFixed(6)}"></trkpt>\n`;
-            }
-            gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
-            const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
-            const url = URL.createObjectURL(blob); const a = document.createElement('a');
-            a.href = url; a.download = 'parcours.gpx'; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-        });
+        // AJOUTER DANS LE <script>, avant les handlers de boutons
+// Fonction pour afficher la boîte de dialogue de sauvegarde
+function showSaveDialog(defaultName) {
+    return new Promise((resolve) => {
+        const dialog = document.getElementById('save-dialog');
+        const input = document.getElementById('filename-input');
+        const confirmBtn = document.getElementById('confirm-save-btn');
+        const cancelBtn = document.getElementById('cancel-save-btn');
 
-        document.getElementById('reset-btn').addEventListener('click', () => {
-            nettoyerCarte(); document.getElementById('info').innerText = "📍 Cliquez sur la carte pour poser votre point de départ.";
-        });
+        // Réinitialiser le champ
+        input.value = defaultName.replace('.gpx', '');
+
+        // Fonction de nettoyage
+        const cleanup = () => {
+            dialog.style.display = 'none';
+            confirmBtn.onclick = null;
+            cancelBtn.onclick = null;
+        };
+
+        // Gestion des boutons
+        confirmBtn.onclick = () => {
+            const filename = input.value.trim() || defaultName.replace('.gpx', '');
+            cleanup();
+            resolve(filename + '.gpx');
+        };
+
+        cancelBtn.onclick = () => {
+            cleanup();
+            resolve(null); // Annulé
+        };
+
+        // Gestion du clic en dehors de la boîte
+        dialog.onclick = (e) => {
+            if (e.target === dialog) {
+                cleanup();
+                resolve(null);
+            }
+        };
+
+        // Gestion de la touche Entrée
+        input.onkeypress = (e) => {
+            if (e.key === 'Enter') {
+                confirmBtn.click();
+            }
+        };
+
+        // Afficher la boîte de dialogue
+        dialog.style.display = 'block';
+        input.focus();
+        input.select();
+    });
+}
+
+        gpxBtn.addEventListener('click', async () => {
+    if (globalCoordinates.length === 0) return;
+
+    const defaultName = 'parcours.gpx';
+    const filename = await showSaveDialog(defaultName);
+
+    if (!filename) return; // Annulé
+
+    let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Générateur Outdoor" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk>\n    <name>${filename.replace('.gpx', '')}</name>\n    <trkseg>\n`;
+    for (let i = 0; i < globalCoordinates.length; i++) {
+        gpxContent += `      <trkpt lat="${globalCoordinates[i].lat.toFixed(6)}" lon="${globalCoordinates[i].lng.toFixed(6)}"></trkpt>\n`;
+    }
+    gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
+
+    const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+});
 
         // --- IMPORT GPX ---
         const importGpxBtn = document.getElementById('import-gpx-btn');
@@ -1096,29 +1242,36 @@
         });
 
         // --- BOUTON VISUALISATION 3D ---
-        const visu3dBtn = document.getElementById('visu3d-btn');
-        function ouvrirDansVisuGPX() {
-            if (globalCoordinates.length === 0) return;
-            let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Éditeur Outdoor PRO" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk>\n    <name>Mon Tracé Outdoor</name>\n    <trkseg>\n`;
-            for (let i = 0; i < globalCoordinates.length; i++) {
-                gpxContent += `      <trkpt lat="${globalCoordinates[i].lat.toFixed(6)}" lon="${globalCoordinates[i].lng.toFixed(6)}"></trkpt>\n`;
-            }
-            gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
-            const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'ma_trace_outdoor.gpx';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            setTimeout(() => {
-                window.open('https://www.visugpx.com/editgpx/', '_blank');
-                document.getElementById('info').innerText = "✅ Fichier 'ma_trace_outdoor.gpx' téléchargé ! Sur VisuGPX : cliquez sur 'Ouvrir GPX' → Sélectionnez le fichier dans vos téléchargements.";
-            }, 800);
-        }
-        visu3dBtn.addEventListener('click', ouvrirDansVisuGPX);
+        async function ouvrirDansVisuGPX() {
+    if (globalCoordinates.length === 0) return;
+
+    const defaultName = 'ma_trace_outdoor.gpx';
+    const filename = await showSaveDialog(defaultName);
+
+    if (!filename) return; // Annulé
+
+    let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Éditeur Outdoor PRO" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk>\n    <name>${filename.replace('.gpx', '')}</name>\n    <trkseg>\n`;
+    for (let i = 0; i < globalCoordinates.length; i++) {
+        gpxContent += `      <trkpt lat="${globalCoordinates[i].lat.toFixed(6)}" lon="${globalCoordinates[i].lng.toFixed(6)}"></trkpt>\n`;
+    }
+    gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
+
+    const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setTimeout(() => {
+        window.open('https://www.visugpx.com/editgpx/', '_blank');
+        document.getElementById('info').innerText = `✅ Fichier '${filename}' téléchargé ! Sur VisuGPX : cliquez sur 'Ouvrir GPX' → Sélectionnez le fichier dans vos téléchargements.`;
+    }, 800);
+}
+visu3dBtn.addEventListener('click', ouvrirDansVisuGPX);
 
         // --- RECHERCHE DE COMMUNES ---
         const searchInput = document.getElementById('search-input');
@@ -1178,5 +1331,7 @@
             }
         });
     </script>
+    
+
 </body>
 </html>
