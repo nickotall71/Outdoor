@@ -236,12 +236,12 @@
                 </div>
                 <div id="search-results" style="margin-top: 6px; max-height: 150px; overflow-y: auto; display: none; background: white; border: 1px solid #ddd; border-radius: 4px; padding: 4px;"></div>
             </div>
-
+            
             <div class="mode-selector">
                 <button id="btn-mode-auto" class="mode-btn active">⚡ Auto (Curseurs)</button>
                 <button id="btn-mode-manual" class="mode-btn">✏️ Dessin (Points)</button>
             </div>
-
+            
             <div id="sub-drawing-mode">
                 <div class="sub-mode-title">Type de liaison pour le prochain point :</div>
                 <div class="drawing-type-selector">
@@ -254,7 +254,7 @@
                 <label><input type="radio" name="format" value="boucle" checked> 🔄 Boucle</label>
                 <label><input type="radio" name="format" value="aller-retour"> ↕️ Aller-Retour</label>
             </div>
-
+            
             <div class="control-group" style="background: #f8f9fa; padding: 8px; border-radius: 5px; border: 1px solid #eee;">
                 <div class="group-label">
                     <span>⏱️ Allure cible :</span>
@@ -1098,18 +1098,27 @@
             visu3dBtn.disabled = true;
         }
 
-        function calculEstimationDuree() {
-            if (totalCalculatedDistance === 0) return;
-            const allureMinutesDecimale = parseFloat(allureSlider.value);
-            let tempsTotalEffort = allureMinutesDecimale * totalCalculatedDistance;
-            let h = Math.floor(tempsTotalEffort / 60); let m = Math.round(tempsTotalEffort % 60);
-            if(m === 60) { h++; m = 0; }
-            let chaineDuree = h > 0 ? `${h}h${m.toString().padStart(2, '0')}` : `${m} min`;
+        
 
-            document.getElementById('info').innerHTML = `🏁 Tracé analysé et lissé !<br>` +
-                `📏 Distance : <b>${totalCalculatedDistance.toFixed(1)} km</b> | ⛰️ Relief : <b>+${totalCalculatedDPlus} m / -${totalCalculatedDMoins} m</b><br>` +
-                `⏱️ Durée est. (${formatAllure(allureMinutesDecimale)}) : <span style="color:#3498db;font-size:14px;"><b>${chaineDuree}</b></span>`;
-        }
+// Variable globale pour stocker le dernier calcul
+let lastCalculatedDuration = null;
+let lastActivityType = null;
+let lastAllureValue = null;
+
+function calculEstimationDuree() {
+    if (totalCalculatedDistance === 0) return;
+    const allureMinutesDecimale = parseFloat(allureSlider.value);
+    const distanceEffortKm = totalCalculatedDistance + (totalCalculatedDPlus / 100) + (totalCalculatedDMoins / 150);
+    const totalMinutes = allureMinutesDecimale * distanceEffortKm;
+    const h = Math.floor(totalMinutes / 60);
+    const m = Math.round(totalMinutes % 60);
+    const durationText = h > 0 ? `${h}h${m.toString().padStart(2, '0')}` : `${m} min`;
+
+    document.getElementById('info').innerHTML = `🏁 Tracé analysé !<br>
+        📏 <b>${totalCalculatedDistance.toFixed(1)} km</b> | ⛰️ <b>+${totalCalculatedDPlus} m / -${totalCalculatedDMoins} m</b><br>
+        ⏱️ Durée est. (${formatAllure(allureMinutesDecimale)}) : <b style="color:#3498db">${durationText}</b><br>
+        📊 <small>Distance équivalente : ${distanceEffortKm.toFixed(1)} km</small>`;
+}
 
         // AJOUTER DANS LE <script>, avant les handlers de boutons
 // Fonction pour afficher la boîte de dialogue de sauvegarde
