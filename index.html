@@ -257,7 +257,7 @@
 
         <!-- SIDEBAR GAUCHE -->
         <div id="controls-sidebar">
-            <h3>Éditeur Outdoor PRO</h3>
+            <h3>Plannificateur de parcours</h3>
             <div class="control-group" id="search-group">
                 <div class="group-label">
                     <span>🔍 Rechercher une commune :</span>
@@ -350,8 +350,7 @@
 <div id="save-dialog" class="modal">
   <div class="modal-content">
     <h3>Nom du fichier GPX</h3>
-    <input type="text" id="filename-input" placeholder="Ex: Mon parcours du 25-05-2026">
-    <div class="modal-buttons">
+<input type="text" id="search-input" placeholder="Ex: 12 rue de Paris, 75001 Paris..." ...>    <div class="modal-buttons">
       <button id="cancel-save-btn">Annuler</button>
       <button id="confirm-save-btn">Enregistrer</button>
     </div>
@@ -1358,8 +1357,7 @@ visu3dBtn.addEventListener('click', ouvrirDansVisuGPX);
         function rechercherCommunes() {
             const query = searchInput.value.trim();
             if (query.length < 2) return;
-            const apiUrl = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&type=municipality&autocomplete=1&limit=5`;
-            fetch(apiUrl)
+const apiUrl = `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&autocomplete=1&limit=5`;            fetch(apiUrl)
                 .then(response => response.json())
                 .then(data => {
                     if (!data.features || data.features.length === 0) {
