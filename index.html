@@ -25,6 +25,38 @@
         #map-container { flex: 1; display: flex; flex-direction: column; height: 100%; position: relative; min-width: 0; }
         #map { flex: 1; width: 100%; }
 
+        /* Bouton plein écran */
+#fullscreen-toggle {
+    position: absolute;
+    top: 120px; /* Ajustez selon la hauteur du sélecteur de fonds de carte */
+    right: 10px;
+    z-index: 1001;
+    width: 40px;
+    height: 40px;
+    background: white;
+    border: 2px solid #34495e;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    font-size: 18px;
+    transition: all 0.2s;
+}
+#fullscreen-toggle:hover {
+    background: #f1f2f6;
+    border-color: #2c3e50;
+}
+#fullscreen-toggle.active {
+    background: #34495e;
+    color: white;
+    border-color: #2c3e50;
+}
+#controls-sidebar.hidden {
+    display: none;
+}
+
         /* STRUCTURE DU PROFIL ALTIMETRIQUE */
         #elevation-outer {
             height: 260px;
@@ -365,6 +397,25 @@
             "🏙️ Plan standard": planCarto
         };
         L.control.layers(fondsDeCarte, null, { collapsed: false }).addTo(map);
+        // Ajout du bouton plein écran
+// Ajout du bouton plein écran (corrigé)
+const fullscreenBtn = L.control({ position: 'topright' });
+fullscreenBtn.onAdd = function() {
+    const div = L.DomUtil.create('div', 'leaflet-control-fullscreen');
+    div.id = 'fullscreen-toggle';
+    div.innerHTML = '⛶';
+    // 👇 Empêche Leaflet de capturer le clic
+    L.DomEvent.disableClickPropagation(div);
+
+    div.onclick = function(e) {
+        L.DomEvent.stopPropagation(e); // Bloque la propagation
+        document.getElementById('controls-sidebar').classList.toggle('hidden');
+        div.classList.toggle('active');
+        map.invalidateSize(); // Redimensionne la carte
+    };
+    return div;
+};
+fullscreenBtn.addTo(map);
 
         // --- INTERFACE UI ---
         const btnAuto = document.getElementById('btn-mode-auto');
